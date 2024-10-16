@@ -1,0 +1,5 @@
+1- in the assignment of the " almostfull " signal it sould be when count = fifo depth-1 .
+2- the under flow signal is a sequential one but is assigned cominationaly .
+3- case of both wr_en =1 and rd_en =1 was not handeled .
+4- when reset ia active wr_ack should be zero .
+5- count ,read pointer and write pointer should be initialized from zero.

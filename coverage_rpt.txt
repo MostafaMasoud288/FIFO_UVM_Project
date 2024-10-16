@@ -1,0 +1,2822 @@
+Coverage Report by file with details
+
+=================================================================================
+=== File: FIFO.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                           25        25         0     100.0
+
+================================Statement Details================================
+
+Statement Coverage for file FIFO.sv --
+
+    1                                                ////////////////////////////////////////////////////////////////////////////////
+    2                                                // Author: Kareem Waseem
+    3                                                // Course: Digital Verification using SV & UVM
+    4                                                //
+    5                                                // Description: FIFO Design 
+    6                                                // 
+    7                                                ////////////////////////////////////////////////////////////////////////////////
+    8                                                import uvm_pkg::*;
+    9                                                `include "uvm_macros.svh"
+    10                                               module FIFO(FIFO_interface.dut inter);
+    11                                                
+    12                                               localparam max_fifo_addr = $clog2(inter.FIFO_DEPTH);
+    13                                               
+    14                                               reg [inter.FIFO_WIDTH-1:0] mem [inter.FIFO_DEPTH-1:0];
+    15                                               
+    16                                               reg [max_fifo_addr-1:0] wr_ptr=0, rd_ptr=0;
+    17                                               reg [max_fifo_addr:0] count=0;//
+    18                                               
+    19              1                       6278     always @(posedge inter.clk or negedge inter.rst_n) begin
+    20                                               	if (!inter.rst_n) begin
+    21              1                        574     		wr_ptr <= 0;
+    22              1                        574     		inter.wr_ack <= 0;//
+    23                                               	end
+    24                                               	else if (inter.wr_en &&  count < inter.FIFO_DEPTH) begin//
+    25              1                       2684     		mem[wr_ptr] <= inter.data_in;
+    26              1                       2684     		inter.wr_ack <= 1;
+    27              1                       2684     		wr_ptr <= wr_ptr + 1;
+    28                                               	end
+    29                                               	else begin 
+    30              1                       3020     		inter.wr_ack <= 0; 
+    31                                               		if (inter.full && inter.wr_en && !inter.rd_en)
+    32              1                        898     			inter.overflow <= 1;
+    33                                               		else
+    34              1                       2122     			inter.overflow <= 0;
+    35                                               	end
+    36                                               end
+    37                                               
+    38              1                       6278     always @(posedge inter.clk or negedge inter.rst_n) begin
+    39                                               	if (!inter.rst_n) begin
+    40              1                        574     		rd_ptr <= 0;
+    41                                               	end
+    42                                               	else if (inter.rd_en  &&count != 0) begin
+    43              1                       1344     		inter.data_out <= mem[rd_ptr];
+    44              1                       1344     		rd_ptr <= rd_ptr + 1;
+    45                                               	end
+    46                                               	else begin  
+    47                                               		if (inter.empty && inter.rd_en && !inter.wr_en)
+    48              1                        502     			inter.underflow <= 1;
+    49                                               		else
+    50              1                       3858     			inter.underflow <= 0;
+    51                                               	end
+    52                                               end
+    53                                               
+    54              1                       4880     always @(posedge inter.clk or negedge inter.rst_n) begin
+    55                                               	if (!inter.rst_n) begin
+    56              1                        564     		count <= 0;
+    57                                               	end
+    58                                               	else begin
+    59                                               		if	( ({inter.wr_en, inter.rd_en} == 2'b10) && !inter.full) 
+    60              1                       1892     			count <= count + 1;
+    61                                               		else if ( ({inter.wr_en, inter.rd_en} == 2'b01) && !inter.empty)
+    62              1                        391     			count <= count - 1;
+    63                                               		else if ( ({inter.wr_en, inter.rd_en} == 2'b11) && inter.full)
+    64              1                        243     			count <= count - 1;
+    65                                               		else if ( ({inter.wr_en, inter.rd_en} == 2'b11) && inter.empty)
+    66              1                         82     			count <= count + 1;
+    67                                               	end
+    68                                               end
+    69                                               
+    70              1                       2857     assign inter.full = (count == inter.FIFO_DEPTH)? 1 : 0;
+    71              1                       2857     assign inter.empty = (count == 0)? 1 : 0;
+    72              1                       2857     assign inter.almostfull = (count == inter.FIFO_DEPTH-1)? 1 : 0; 
+    73              1                       2857     assign inter.almostempty = (count == 1)? 1 : 0;
+    74                                               
+    75                                               
+    76                                               `ifdef SIM
+    77                                               always_comb begin : reset_check
+    78                                               	if(!inter.rst_n)
+    79                                               	reset: assert final (count==0 && rd_ptr==0 && wr_ptr==0 && inter.empty && !inter.full && !inter.almostfull && !inter.almostempty);
+    80                                               	reset_cover:cover (count==0 && rd_ptr==0 && wr_ptr==0 && inter.empty && !inter.full && !inter.almostfull && !inter.almostempty);
+    81                                               end
+    82                                               
+    83                                               always_comb begin : comb_checks
+    84                                               	if(inter.rst_n) begin
+    85                                               		if(count==inter.FIFO_DEPTH)begin
+    86                                               			full_check:assert(inter.full==1'b1);
+    87                                               			full_cover:cover(inter.full==1'b1);
+    88                                               		end
+    89                                               		if(count==inter.FIFO_DEPTH-1)begin
+    90                                               			almostfull_check:assert(inter.almostfull==1'b1);
+    91                                               			almostfull_cover:cover(inter.almostfull==1'b1);
+    92                                               		end
+    93                                               		if(count==0)begin
+    94                                               			empty_check:assert(inter.empty==1'b1);
+    95                                               			empty_cover:cover(inter.empty==1'b1);
+    96                                               		end
+    97                                               		if(count==1)begin
+    98                                               			almostempty_check:assert(inter.almostempty==1'b1);
+    99                                               			almostempty_cover :cover(inter.almostempty==1'b1);
+    100                                              		end
+    101                                              	end
+    102                                              end
+    103                                              
+    104                                              
+    105                                              property writing;
+    106                                              @(posedge inter.clk) disable iff(!inter.rst_n) (inter.wr_en && !inter.full) |=> (wr_ptr==$past(wr_ptr)+1'b1);
+    107                                              endproperty
+    108                                              
+    109                                              writing_assert:assert property (writing);
+    110                                              writing_cover:cover property (writing);
+    111                                              
+    112                                              property reading;
+    113                                              @(posedge inter.clk) disable iff(!inter.rst_n) (!inter.wr_en && inter.rd_en && !inter.empty) |=> (rd_ptr==$past(rd_ptr)+1'b1);
+    114                                              endproperty
+    115                                              
+    116                                              reading_assert:assert property (reading);
+    117                                              reading_cover:cover property (reading);
+    118                                              
+    119                                              property WriteNotRead;
+    120                                              @(posedge inter.clk) disable iff(!inter.rst_n) (inter.wr_en && inter.rd_en && inter.empty) |=> (wr_ptr==$past(wr_ptr)+1'b1);
+    121                                              endproperty
+    122                                              
+    123                                              WriteNotRead_assert:assert property (WriteNotRead);
+    124                                              WriteNotRead_cover:cover property (WriteNotRead);
+    125                                              
+    126                                              property ReadNotWrite;
+    127                                              @(posedge inter.clk) disable iff(!inter.rst_n) (inter.wr_en && inter.rd_en && inter.full) |=> (rd_ptr==$past(rd_ptr)+1'b1);
+    128                                              endproperty
+    129                                              
+    130                                              ReadNotWrite_assert:assert property (ReadNotWrite);
+    131                                              ReadNotWrite_cover:cover property (ReadNotWrite);
+    132                                              
+    133                                              property accept_writing;
+    134                                              @(posedge inter.clk) disable iff(!inter.rst_n) (inter.wr_en && !inter.full) |=> (inter.wr_ack);
+    135                                              endproperty
+    136                                              
+    137                                              accept_writing_assert:assert property (accept_writing);
+    138                                              accept_writing_cover:cover property (accept_writing);
+    139                                              
+    140                                              property refuse_writing;
+    141                                              @(posedge inter.clk) disable iff(!inter.rst_n) (inter.wr_en && inter.full) |=> (!inter.wr_ack);
+    142                                              endproperty
+    143                                              
+    144                                              refuse_writing_assert:assert property (refuse_writing);
+    145                                              refuse_writing_cover:cover property (refuse_writing);
+    146                                              
+    147                                              property count_no_change;
+    148                                              @(posedge inter.clk) disable iff(!inter.rst_n) (!inter.wr_en && !inter.rd_en) |=> ($stable(count));
+    149                                              endproperty
+    150                                              
+    151                                              count_no_change_assert:assert property (count_no_change);
+    152                                              count_no_change_cover:cover property (count_no_change);
+    153                                              
+    154                                              property count_up;
+    155                                              @(posedge inter.clk) disable iff(!inter.rst_n) ((inter.wr_en && !inter.rd_en && !inter.full)||(inter.wr_en && inter.rd_en && inter.empty)) 
+    156                                              |=> (count==$past(count)+1'b1);
+    157                                              endproperty
+    158                                              
+    159                                              count_up_assert:assert property (count_up);
+    160                                              count_up_cover:cover property (count_up);
+    161                                              
+    162                                              property count_down;
+    163                                              @(posedge inter.clk) disable iff(!inter.rst_n) ((!inter.wr_en && inter.rd_en && !inter.empty)||(inter.wr_en && inter.rd_en && inter.full)) 
+    164                                              |=> (count==$past(count)-1'b1);
+    165                                              endproperty
+    166                                              
+    167                                              count_down_assert:assert property (count_down);
+    168                                              count_down_cover:cover property (count_down);
+    169                                              
+    170                                              property count_above;
+    171                                              @(posedge inter.clk) (count < 4'b1001) ;
+    172                                              endproperty
+    173                                              
+    174                                              count_above_assert:assert property (count_above);
+    175                                              count_above_cover:cover property (count_above);
+    176                                              
+    177                                              property over_flow;
+    178                                              @(posedge inter.clk) disable iff(!inter.rst_n) (inter.wr_en && !inter.rd_en && inter.full) |=> (inter.overflow);
+    179                                              endproperty
+    180                                              
+    181                                              over_flow_assert:assert property (over_flow);
+    182                                              over_flow_cover:cover property (over_flow);
+    183                                              
+    184                                              property under_flow;
+    185                                              @(posedge inter.clk) disable iff(!inter.rst_n) (!inter.wr_en && inter.rd_en && inter.empty) |=> (inter.underflow);
+    186                                              endproperty
+    187                                              
+    188                                              under_flow_assert:assert property (under_flow);
+    189                                              under_flow_cover:cover property (under_flow);
+    190                                              
+    191                                              `endif 
+    192                                              
+    193                                              endmodule
+
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                        25        25         0     100.0
+
+================================Branch Details================================
+
+Branch Coverage for file FIFO.sv --
+
+------------------------------------IF Branch------------------------------------
+    20                                      6278     Count coming in to IF
+    20              1                        574     	if (!inter.rst_n) begin
+    24              1                       2684     	else if (inter.wr_en &&  count < inter.FIFO_DEPTH) begin//
+    29              1                       3020     	else begin 
+Branch totals: 3 hits of 3 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    31                                      3020     Count coming in to IF
+    31              1                        898     		if (inter.full && inter.wr_en && !inter.rd_en)
+    33              1                       2122     		else
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    39                                      6278     Count coming in to IF
+    39              1                        574     	if (!inter.rst_n) begin
+    42              1                       1344     	else if (inter.rd_en  &&count != 0) begin
+    46              1                       4360     	else begin  
+Branch totals: 3 hits of 3 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    47                                      4360     Count coming in to IF
+    47              1                        502     		if (inter.empty && inter.rd_en && !inter.wr_en)
+    49              1                       3858     		else
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    55                                      4880     Count coming in to IF
+    55              1                        564     	if (!inter.rst_n) begin
+    58              1                       4316     	else begin
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    59                                      4316     Count coming in to IF
+    59              1                       1892     		if	( ({inter.wr_en, inter.rd_en} == 2'b10) && !inter.full) 
+    61              1                        391     		else if ( ({inter.wr_en, inter.rd_en} == 2'b01) && !inter.empty)
+    63              1                        243     		else if ( ({inter.wr_en, inter.rd_en} == 2'b11) && inter.full)
+    65              1                         82     		else if ( ({inter.wr_en, inter.rd_en} == 2'b11) && inter.empty)
+                                            1708     All False Count
+Branch totals: 5 hits of 5 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    70                                      2857     Count coming in to IF
+    70              1                        416     assign inter.full = (count == inter.FIFO_DEPTH)? 1 : 0;
+    70              2                       2441     assign inter.full = (count == inter.FIFO_DEPTH)? 1 : 0;
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    71                                      2857     Count coming in to IF
+    71              1                        296     assign inter.empty = (count == 0)? 1 : 0;
+    71              2                       2561     assign inter.empty = (count == 0)? 1 : 0;
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    72                                      2857     Count coming in to IF
+    72              1                        537     assign inter.almostfull = (count == inter.FIFO_DEPTH-1)? 1 : 0; 
+    72              2                       2320     assign inter.almostfull = (count == inter.FIFO_DEPTH-1)? 1 : 0; 
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    73                                      2857     Count coming in to IF
+    73              1                        341     assign inter.almostempty = (count == 1)? 1 : 0;
+    73              2                       2516     assign inter.almostempty = (count == 1)? 1 : 0;
+Branch totals: 2 hits of 2 branches = 100.0%
+
+
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms             22        22         0     100.0
+
+================================Condition Details================================
+
+Condition Coverage for file FIFO.sv --
+
+----------------Focused Condition View-------------------
+Line       24 Item    1  (inter.wr_en && (count < inter.FIFO_DEPTH))
+Condition totals: 2 of 2 input terms covered = 100.0%
+
+                  Input Term   Covered  Reason for no coverage   Hint
+                 -----------  --------  -----------------------  --------------
+                 inter.wr_en         Y
+  (count < inter.FIFO_DEPTH)         Y
+
+     Rows:       Hits  FEC Target                    Non-masking condition(s)      
+ ---------  ---------  --------------------          -------------------------     
+  Row   1:          1  inter.wr_en_0                 -                             
+  Row   2:          1  inter.wr_en_1                 (count < inter.FIFO_DEPTH)    
+  Row   3:          1  (count < inter.FIFO_DEPTH)_0  inter.wr_en                   
+  Row   4:          1  (count < inter.FIFO_DEPTH)_1  inter.wr_en                   
+
+----------------Focused Condition View-------------------
+Line       31 Item    1  ((inter.full && inter.wr_en) && ~inter.rd_en)
+Condition totals: 3 of 3 input terms covered = 100.0%
+
+   Input Term   Covered  Reason for no coverage   Hint
+  -----------  --------  -----------------------  --------------
+   inter.full         Y
+  inter.wr_en         Y
+  inter.rd_en         Y
+
+     Rows:       Hits  FEC Target            Non-masking condition(s)      
+ ---------  ---------  --------------------  -------------------------     
+  Row   1:          1  inter.full_0          -                             
+  Row   2:          1  inter.full_1          (~inter.rd_en && inter.wr_en) 
+  Row   3:          1  inter.wr_en_0         inter.full                    
+  Row   4:          1  inter.wr_en_1         (~inter.rd_en && inter.full)  
+  Row   5:          1  inter.rd_en_0         (inter.full && inter.wr_en)   
+  Row   6:          1  inter.rd_en_1         (inter.full && inter.wr_en)   
+
+----------------Focused Condition View-------------------
+Line       42 Item    1  (inter.rd_en && (count != 0))
+Condition totals: 2 of 2 input terms covered = 100.0%
+
+    Input Term   Covered  Reason for no coverage   Hint
+   -----------  --------  -----------------------  --------------
+   inter.rd_en         Y
+  (count != 0)         Y
+
+     Rows:       Hits  FEC Target            Non-masking condition(s)      
+ ---------  ---------  --------------------  -------------------------     
+  Row   1:          1  inter.rd_en_0         -                             
+  Row   2:          1  inter.rd_en_1         (count != 0)                  
+  Row   3:          1  (count != 0)_0        inter.rd_en                   
+  Row   4:          1  (count != 0)_1        inter.rd_en                   
+
+----------------Focused Condition View-------------------
+Line       47 Item    1  ((inter.empty && inter.rd_en) && ~inter.wr_en)
+Condition totals: 3 of 3 input terms covered = 100.0%
+
+   Input Term   Covered  Reason for no coverage   Hint
+  -----------  --------  -----------------------  --------------
+  inter.empty         Y
+  inter.rd_en         Y
+  inter.wr_en         Y
+
+     Rows:       Hits  FEC Target            Non-masking condition(s)      
+ ---------  ---------  --------------------  -------------------------     
+  Row   1:          1  inter.empty_0         -                             
+  Row   2:          1  inter.empty_1         (~inter.wr_en && inter.rd_en) 
+  Row   3:          1  inter.rd_en_0         inter.empty                   
+  Row   4:          1  inter.rd_en_1         (~inter.wr_en && inter.empty) 
+  Row   5:          1  inter.wr_en_0         (inter.empty && inter.rd_en)  
+  Row   6:          1  inter.wr_en_1         (inter.empty && inter.rd_en)  
+
+----------------Focused Condition View-------------------
+Line       59 Item    1  ((~inter.rd_en && inter.wr_en) && ~inter.full)
+Condition totals: 3 of 3 input terms covered = 100.0%
+
+   Input Term   Covered  Reason for no coverage   Hint
+  -----------  --------  -----------------------  --------------
+  inter.rd_en         Y
+  inter.wr_en         Y
+   inter.full         Y
+
+     Rows:       Hits  FEC Target            Non-masking condition(s)      
+ ---------  ---------  --------------------  -------------------------     
+  Row   1:          1  inter.rd_en_0         (~inter.full && inter.wr_en)  
+  Row   2:          1  inter.rd_en_1         -                             
+  Row   3:          1  inter.wr_en_0         ~inter.rd_en                  
+  Row   4:          1  inter.wr_en_1         (~inter.full && ~inter.rd_en) 
+  Row   5:          1  inter.full_0          (~inter.rd_en && inter.wr_en) 
+  Row   6:          1  inter.full_1          (~inter.rd_en && inter.wr_en) 
+
+----------------Focused Condition View-------------------
+Line       61 Item    1  ((inter.rd_en && ~inter.wr_en) && ~inter.empty)
+Condition totals: 3 of 3 input terms covered = 100.0%
+
+   Input Term   Covered  Reason for no coverage   Hint
+  -----------  --------  -----------------------  --------------
+  inter.rd_en         Y
+  inter.wr_en         Y
+  inter.empty         Y
+
+     Rows:       Hits  FEC Target            Non-masking condition(s)      
+ ---------  ---------  --------------------  -------------------------     
+  Row   1:          1  inter.rd_en_0         -                             
+  Row   2:          1  inter.rd_en_1         (~inter.empty && ~inter.wr_en)
+  Row   3:          1  inter.wr_en_0         (~inter.empty && inter.rd_en) 
+  Row   4:          1  inter.wr_en_1         inter.rd_en                   
+  Row   5:          1  inter.empty_0         (inter.rd_en && ~inter.wr_en) 
+  Row   6:          1  inter.empty_1         (inter.rd_en && ~inter.wr_en) 
+
+----------------Focused Condition View-------------------
+Line       63 Item    1  ((inter.rd_en && inter.wr_en) && inter.full)
+Condition totals: 3 of 3 input terms covered = 100.0%
+
+   Input Term   Covered  Reason for no coverage   Hint
+  -----------  --------  -----------------------  --------------
+  inter.rd_en         Y
+  inter.wr_en         Y
+   inter.full         Y
+
+     Rows:       Hits  FEC Target            Non-masking condition(s)      
+ ---------  ---------  --------------------  -------------------------     
+  Row   1:          1  inter.rd_en_0         -                             
+  Row   2:          1  inter.rd_en_1         (inter.full && inter.wr_en)   
+  Row   3:          1  inter.wr_en_0         inter.rd_en                   
+  Row   4:          1  inter.wr_en_1         (inter.full && inter.rd_en)   
+  Row   5:          1  inter.full_0          (inter.rd_en && inter.wr_en)  
+  Row   6:          1  inter.full_1          (inter.rd_en && inter.wr_en)  
+
+----------------Focused Condition View-------------------
+Line       65 Item    1  ((inter.rd_en && inter.wr_en) && inter.empty)
+Condition totals: 3 of 3 input terms covered = 100.0%
+
+   Input Term   Covered  Reason for no coverage   Hint
+  -----------  --------  -----------------------  --------------
+  inter.rd_en         Y
+  inter.wr_en         Y
+  inter.empty         Y
+
+     Rows:       Hits  FEC Target            Non-masking condition(s)      
+ ---------  ---------  --------------------  -------------------------     
+  Row   1:          1  inter.rd_en_0         -                             
+  Row   2:          1  inter.rd_en_1         (inter.empty && inter.wr_en)  
+  Row   3:          1  inter.wr_en_0         inter.rd_en                   
+  Row   4:          1  inter.wr_en_1         (inter.empty && inter.rd_en)  
+  Row   5:          1  inter.empty_0         (inter.rd_en && inter.wr_en)  
+  Row   6:          1  inter.empty_1         (inter.rd_en && inter.wr_en)  
+
+
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                     20        20         0     100.0
+
+================================Toggle Details================================
+
+Toggle Coverage for File FIFO.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+         16                              wr_ptr[2]           1           1      100.00 
+         16                              wr_ptr[1]           1           1      100.00 
+         16                              wr_ptr[0]           1           1      100.00 
+         16                              rd_ptr[2]           1           1      100.00 
+         16                              rd_ptr[1]           1           1      100.00 
+         16                              rd_ptr[0]           1           1      100.00 
+         17                               count[3]           1           1      100.00 
+         17                               count[2]           1           1      100.00 
+         17                               count[1]           1           1      100.00 
+         17                               count[0]           1           1      100.00 
+
+Total Node Count     =         10 
+Toggled Node Count   =         10 
+Untoggled Node Count =          0 
+
+Toggle Coverage      =      100.0% (20 of 20 bins)
+
+=================================================================================
+=== File: FIFO_agent.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                           14        10         4      71.4
+
+================================Statement Details================================
+
+Statement Coverage for file FIFO_agent.sv --
+
+    1                                                package FIFO_agent_pck;
+    2                                                
+    3                                                import uvm_pkg::*;
+    4                                                import FIFO_sequencer_pck::*;
+    5                                                import FIFO_sequence_item_pck::*;
+    6                                                import FIFO_driver_pck::*;
+    7                                                import FIFO_monitor_pck::*;
+    8                                                import FIFO_config_pck::*;
+    9                                                `include "uvm_macros.svh"
+    10                                               
+    11                                               class FIFO_agent extends uvm_agent;
+    12              1                    ***0***     `uvm_component_utils(FIFO_agent)
+    12              2                    ***0***     
+    12              3                    ***0***     
+    13                                               FIFO_sequencer sqr;
+    14                                               FIFO_driver drv;
+    15                                               FIFO_monitor mon;
+    16                                               FIFO_config FIFO_cfg;
+    17                                               uvm_analysis_port #(FIFO_sequence_item) agt_ap;
+    18                                               
+    19                                               function new (string name = "FIFO_agent",uvm_component parent =null);
+    20              1                          1       super.new(name,parent);
+    21                                               endfunction
+    22                                               
+    23                                               function void build_phase (uvm_phase phase);
+    24              1                          1      super.build_phase(phase);
+    25                                                if(!uvm_config_db #(FIFO_config)::get(this,"","CFG",FIFO_cfg)) begin
+    26              1                    ***0***        `uvm_fatal("bulid_phase","Driver - Unable to get configuration object") ;end
+    27                                               
+    28              1                          1      drv = FIFO_driver::type_id::create("drv",this);
+    29              1                          1      sqr = FIFO_sequencer::type_id::create("sqr",this);
+    30              1                          1      mon = FIFO_monitor::type_id::create("mon",this);
+    31              1                          1      agt_ap=new("agt_ap",this);
+    32                                               endfunction
+    33                                               
+    34                                               function void connect_phase (uvm_phase phase);
+    35              1                          1      drv.FIFO_vif = FIFO_cfg.FIFO_vif ;
+    36              1                          1      mon.FIFO_vif = FIFO_cfg.FIFO_vif ;
+    37              1                          1      drv.seq_item_port.connect(sqr.seq_item_export);
+    38              1                          1      mon.mon_ap.connect(agt_ap);
+    39                                               endfunction
+    40                                               
+    41                                               endclass
+    42                                               endpackage
+
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                         4         1         3      25.0
+
+================================Branch Details================================
+
+Branch Coverage for file FIFO_agent.sv --
+
+------------------------------------IF Branch------------------------------------
+    25                                         1     Count coming in to IF
+    25              1                    ***0***      if(!uvm_config_db #(FIFO_config)::get(this,"","CFG",FIFO_cfg)) begin
+                                               1     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+------------------------------------IF Branch------------------------------------
+    26                                   ***0***     Count coming in to IF
+    26              1                    ***0***        `uvm_fatal("bulid_phase","Driver - Unable to get configuration object") ;end
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms              0         0         0     100.0
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                      0         0         0     100.0
+
+================================Toggle Details================================
+
+Toggle Coverage for File FIFO_agent.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+
+Total Node Count     =          0 
+Toggled Node Count   =          0 
+Untoggled Node Count =          0 
+
+Toggle Coverage      =      100.0% (0 of 0 bins)
+
+=================================================================================
+=== File: FIFO_assertions.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                            2         2         0     100.0
+
+================================Statement Details================================
+
+Statement Coverage for file FIFO_assertions.sv --
+
+    1                                                
+    2                                                module FIFO_assertions (clk,data_in,rst_n, wr_en, rd_en,data_out,wr_ack, overflow,full, empty, almostfull, almostempty, underflow);
+    3                                                
+    4                                                parameter FIFO_WIDTH = 16;
+    5                                                parameter FIFO_DEPTH = 8;
+    6                                                input clk;
+    7                                                input [FIFO_WIDTH-1:0] data_in;
+    8                                                input  rst_n, wr_en, rd_en;
+    9                                                input [FIFO_WIDTH-1:0] data_out;
+    10                                               input wr_ack, overflow;
+    11                                               input full, empty, almostfull, almostempty, underflow;
+    12                                               
+    13              1                       4124     always_comb begin : reset_check
+    14                                               	if(!rst_n)
+    15                                               	reset: assert final (DUT.count==0 && DUT.rd_ptr==0 && DUT.wr_ptr==0 && empty && !full && !almostfull && !almostempty);
+    16                                               	reset_cover:cover (DUT.count==0 && DUT.rd_ptr==0 && DUT.wr_ptr==0 && empty && !full && !almostfull && !almostempty);
+    17                                               end
+    18                                               
+    19              1                       3136     always_comb begin : comb_checks
+    20                                               	if(rst_n) begin
+    21                                               		if(DUT.count==FIFO_DEPTH)begin
+    22                                               			full_check:assert(full==1'b1);
+    23                                               			full_cover:cover(full==1'b1);
+    24                                               		end
+    25                                               		if(DUT.count==inter.FIFO_DEPTH-1)begin
+    26                                               			almostfull_check:assert(almostfull==1'b1);
+    27                                               			almostfull_cover:cover(almostfull==1'b1);
+    28                                               		end
+    29                                               		if(DUT.count==0)begin
+    30                                               			empty_check:assert(empty==1'b1);
+    31                                               			empty_cover:cover(empty==1'b1);
+    32                                               		end
+    33                                               		if(DUT.count==1)begin
+    34                                               			almostempty_check:assert(almostempty==1'b1);
+    35                                               			almostempty_cover :cover(almostempty==1'b1);
+    36                                               		end
+    37                                               	end
+    38                                               end
+    39                                               
+    40                                               
+    41                                               property writing;
+    42                                               @(posedge clk) disable iff(!rst_n) (wr_en && !full) |=> (DUT.wr_ptr==$past(DUT.wr_ptr)+1'b1);
+    43                                               endproperty
+    44                                               
+    45                                               writing_assert:assert property (writing);
+    46                                               writing_cover:cover property (writing);
+    47                                               
+    48                                               property reading;
+    49                                               @(posedge clk) disable iff(!rst_n) (!wr_en && rd_en && !empty) |=> (DUT.rd_ptr==$past(DUT.rd_ptr)+1'b1);
+    50                                               endproperty
+    51                                               
+    52                                               reading_assert:assert property (reading);
+    53                                               reading_cover:cover property (reading);
+    54                                               
+    55                                               property WriteNotRead;
+    56                                               @(posedge clk) disable iff(!rst_n) (wr_en && rd_en && empty) |=> (DUT.wr_ptr==$past(DUT.wr_ptr)+1'b1);
+    57                                               endproperty
+    58                                               
+    59                                               WriteNotRead_assert:assert property (WriteNotRead);
+    60                                               WriteNotRead_cover:cover property (WriteNotRead);
+    61                                               
+    62                                               property ReadNotWrite;
+    63                                               @(posedge clk) disable iff(!rst_n) (wr_en && rd_en && full) |=> (DUT.rd_ptr==$past(DUT.rd_ptr)+1'b1);
+    64                                               endproperty
+    65                                               
+    66                                               ReadNotWrite_assert:assert property (ReadNotWrite);
+    67                                               ReadNotWrite_cover:cover property (ReadNotWrite);
+    68                                               
+    69                                               property accept_writing;
+    70                                               @(posedge clk) disable iff(!rst_n) (wr_en && !full) |=> (wr_ack);
+    71                                               endproperty
+    72                                               
+    73                                               accept_writing_assert:assert property (accept_writing);
+    74                                               accept_writing_cover:cover property (accept_writing);
+    75                                               
+    76                                               property refuse_writing;
+    77                                               @(posedge clk) disable iff(!rst_n) (wr_en && full) |=> (!wr_ack);
+    78                                               endproperty
+    79                                               
+    80                                               refuse_writing_assert:assert property (refuse_writing);
+    81                                               refuse_writing_cover:cover property (refuse_writing);
+    82                                               
+    83                                               property count_no_change;
+    84                                               @(posedge inter.clk) disable iff(!rst_n) (!wr_en && !rd_en) |=> ($stable(DUT.count));
+    85                                               endproperty
+    86                                               
+    87                                               count_no_change_assert:assert property (count_no_change);
+    88                                               count_no_change_cover:cover property (count_no_change);
+    89                                               
+    90                                               property count_up;
+    91                                               @(posedge inter.clk) disable iff(!inter.rst_n) ((wr_en && !rd_en && !full)||(wr_en && rd_en && empty)) 
+    92                                               |=> (DUT.count==$past(DUT.count)+1'b1);
+    93                                               endproperty
+    94                                               
+    95                                               count_up_assert:assert property (count_up);
+    96                                               count_up_cover:cover property (count_up);
+    97                                               
+    98                                               property count_down;
+    99                                               @(posedge clk) disable iff(!rst_n) ((!wr_en && rd_en && !empty)||(wr_en && rd_en && full)) 
+    100                                              |=> (DUT.count==$past(DUT.count)-1'b1);
+    101                                              endproperty
+    102                                              
+    103                                              count_down_assert:assert property (count_down);
+    104                                              count_down_cover:cover property (count_down);
+    105                                              
+    106                                              property count_above;
+    107                                              @(posedge clk) (DUT.count < 4'b1001) ;
+    108                                              endproperty
+    109                                              
+    110                                              count_above_assert:assert property (count_above);
+    111                                              count_above_cover:cover property (count_above);
+    112                                              
+    113                                              property over_flow;
+    114                                              @(posedge clk) disable iff(!rst_n) (wr_en && !rd_en && full) |=> (overflow);
+    115                                              endproperty
+    116                                              
+    117                                              over_flow_assert:assert property (over_flow);
+    118                                              over_flow_cover:cover property (over_flow);
+    119                                              
+    120                                              property under_flow;
+    121                                              @(posedge clk) disable iff(!rst_n) (!wr_en && rd_en && empty) |=> (underflow);
+    122                                              endproperty
+    123                                              
+    124                                              under_flow_assert:assert property (under_flow);
+    125                                              under_flow_cover:cover property (under_flow);
+    126                                              
+    127                                              endmodule
+
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                        12        12         0     100.0
+
+================================Branch Details================================
+
+Branch Coverage for file FIFO_assertions.sv --
+
+------------------------------------IF Branch------------------------------------
+    14                                      4124     Count coming in to IF
+    14              1                        527     	if(!rst_n)
+                                            3597     All False Count
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    20                                      3136     Count coming in to IF
+    20              1                       2886     	if(rst_n) begin
+                                             250     All False Count
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    21                                      2886     Count coming in to IF
+    21              1                        416     		if(DUT.count==FIFO_DEPTH)begin
+                                            2470     All False Count
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    25                                      2886     Count coming in to IF
+    25              1                        537     		if(DUT.count==inter.FIFO_DEPTH-1)begin
+                                            2349     All False Count
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    29                                      2886     Count coming in to IF
+    29              1                        325     		if(DUT.count==0)begin
+                                            2561     All False Count
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    33                                      2886     Count coming in to IF
+    33              1                        341     		if(DUT.count==1)begin
+                                            2545     All False Count
+Branch totals: 2 hits of 2 branches = 100.0%
+
+
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms              0         0         0     100.0
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                     86        86         0     100.0
+
+================================Toggle Details================================
+
+Toggle Coverage for File FIFO_assertions.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+          6                                    clk           1           1      100.00 
+          7                             data_in[9]           1           1      100.00 
+          7                             data_in[8]           1           1      100.00 
+          7                             data_in[7]           1           1      100.00 
+          7                             data_in[6]           1           1      100.00 
+          7                             data_in[5]           1           1      100.00 
+          7                             data_in[4]           1           1      100.00 
+          7                             data_in[3]           1           1      100.00 
+          7                             data_in[2]           1           1      100.00 
+          7                             data_in[1]           1           1      100.00 
+          7                            data_in[15]           1           1      100.00 
+          7                            data_in[14]           1           1      100.00 
+          7                            data_in[13]           1           1      100.00 
+          7                            data_in[12]           1           1      100.00 
+          7                            data_in[11]           1           1      100.00 
+          7                            data_in[10]           1           1      100.00 
+          7                             data_in[0]           1           1      100.00 
+          8                                  wr_en           1           1      100.00 
+          8                                  rst_n           1           1      100.00 
+          8                                  rd_en           1           1      100.00 
+          9                            data_out[9]           1           1      100.00 
+          9                            data_out[8]           1           1      100.00 
+          9                            data_out[7]           1           1      100.00 
+          9                            data_out[6]           1           1      100.00 
+          9                            data_out[5]           1           1      100.00 
+          9                            data_out[4]           1           1      100.00 
+          9                            data_out[3]           1           1      100.00 
+          9                            data_out[2]           1           1      100.00 
+          9                            data_out[1]           1           1      100.00 
+          9                           data_out[15]           1           1      100.00 
+          9                           data_out[14]           1           1      100.00 
+          9                           data_out[13]           1           1      100.00 
+          9                           data_out[12]           1           1      100.00 
+          9                           data_out[11]           1           1      100.00 
+          9                           data_out[10]           1           1      100.00 
+          9                            data_out[0]           1           1      100.00 
+         10                                 wr_ack           1           1      100.00 
+         10                               overflow           1           1      100.00 
+         11                              underflow           1           1      100.00 
+         11                                   full           1           1      100.00 
+         11                                  empty           1           1      100.00 
+         11                             almostfull           1           1      100.00 
+         11                            almostempty           1           1      100.00 
+
+Total Node Count     =         43 
+Toggled Node Count   =         43 
+Untoggled Node Count =          0 
+
+Toggle Coverage      =      100.0% (86 of 86 bins)
+
+=================================================================================
+=== File: FIFO_config.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                           11         1        10       9.0
+
+================================Statement Details================================
+
+Statement Coverage for file FIFO_config.sv --
+
+    1                                                package FIFO_config_pck;
+    2                                                
+    3                                                import uvm_pkg::*;
+    4                                                `include "uvm_macros.svh"
+    5                                                class FIFO_config extends uvm_object;
+    6                                                
+    7               1                    ***0***      `uvm_object_utils(FIFO_config)
+    7               2                    ***0***     
+    7               3                    ***0***     
+    7               4                    ***0***     
+    7               5                    ***0***     
+    7               6                    ***0***     
+    7               7                    ***0***     
+    7               8                    ***0***     
+    7               9                    ***0***     
+    7              10                    ***0***     
+    8                                                virtual FIFO_interface FIFO_vif;
+    9                                                function new (string name = "FIFO_config");
+    10              1                          1       super.new(name);
+    11                                               endfunction
+    12                                               endclass
+    13                                               endpackage
+
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                        10         0        10       0.0
+
+================================Branch Details================================
+
+Branch Coverage for file FIFO_config.sv --
+
+------------------------------------IF Branch------------------------------------
+    7                                    ***0***     Count coming in to IF
+    7               1                    ***0***      `uvm_object_utils(FIFO_config)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    7                                    ***0***     Count coming in to IF
+    7               2                    ***0***      `uvm_object_utils(FIFO_config)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    7                                    ***0***     Count coming in to IF
+    7               3                    ***0***      `uvm_object_utils(FIFO_config)
+    7               4                    ***0***      `uvm_object_utils(FIFO_config)
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    7                                    ***0***     Count coming in to IF
+    7               5                    ***0***      `uvm_object_utils(FIFO_config)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    7                                    ***0***     Count coming in to IF
+    7               6                    ***0***      `uvm_object_utils(FIFO_config)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms              0         0         0     100.0
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                      0         0         0     100.0
+
+================================Toggle Details================================
+
+Toggle Coverage for File FIFO_config.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+
+Total Node Count     =          0 
+Toggled Node Count   =          0 
+Untoggled Node Count =          0 
+
+Toggle Coverage      =      100.0% (0 of 0 bins)
+
+=================================================================================
+=== File: FIFO_coverage.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                           14        11         3      78.5
+
+================================Statement Details================================
+
+Statement Coverage for file FIFO_coverage.sv --
+
+    1                                                package FIFO_coverage_pck;
+    2                                                import FIFO_sequence_item_pck::*;
+    3                                                import FIFO_config_pck::*;
+    4                                                import uvm_pkg::*;
+    5                                                `include "uvm_macros.svh"
+    6                                                
+    7                                                class FIFO_coverage extends uvm_component;
+    8               1                    ***0***      `uvm_component_utils(FIFO_coverage)
+    8               2                    ***0***     
+    8               3                    ***0***     
+    9                                                 uvm_analysis_export #(FIFO_sequence_item) cov_export;
+    10                                                uvm_tlm_analysis_fifo #(FIFO_sequence_item) cov_fifo;
+    11                                                FIFO_sequence_item seq_item_cov;
+    12                                               
+    13                                               covergroup cvr_grp ;
+    14                                               wr_ack_cp:coverpoint seq_item_cov.wr_ack
+    15                                               {
+    16                                                   bins wr_ack_0={0};
+    17                                                   bins wr_ack_1={1};
+    18                                               }
+    19                                               overflow_cp:coverpoint seq_item_cov.overflow
+    20                                               {
+    21                                                   bins overflow_0={0};
+    22                                                   bins overflow_1={1};
+    23                                               }
+    24                                               underflow_cp:coverpoint seq_item_cov.underflow
+    25                                               {
+    26                                                   bins underflow_0={0};
+    27                                                   bins underflow_1={1};
+    28                                               }
+    29                                               full_cp:coverpoint seq_item_cov.full
+    30                                               {
+    31                                                   bins full_0={0};
+    32                                                   bins full_1={1};
+    33                                               }
+    34                                               almostfull_cp:coverpoint seq_item_cov.almostfull
+    35                                               {
+    36                                                   bins almostfull_0={0};
+    37                                                   bins almostfull_1={1};
+    38                                               }
+    39                                               empty_cp:coverpoint seq_item_cov.empty
+    40                                               {
+    41                                                   bins empty_0={0};
+    42                                                   bins empty_1={1};
+    43                                               }
+    44                                               almostempty_cp:coverpoint seq_item_cov.almostempty
+    45                                               {
+    46                                                   bins almostempty_0={0};
+    47                                                   bins almostempty_1={1};
+    48                                               }
+    49                                               wr_en_cp:coverpoint seq_item_cov.wr_en
+    50                                               {
+    51                                                   bins wr_en_0={0};
+    52                                                   bins wr_en_1={1};
+    53                                               }
+    54                                               rd_en_cp:coverpoint seq_item_cov.rd_en
+    55                                               {
+    56                                                   bins rd_en_0={0};
+    57                                                   bins rd_en_1={1};
+    58                                               }
+    59                                               wr_ack: cross wr_en_cp, rd_en_cp,wr_ack_cp
+    60                                               {
+    61                                                   illegal_bins wr_ack_illegal_1 = binsof (wr_en_cp.wr_en_0)&&binsof (rd_en_cp.rd_en_0) && binsof (wr_ack_cp.wr_ack_1);
+    62                                                   illegal_bins wr_ack_illegal_2 = binsof (wr_en_cp.wr_en_0)&&binsof (rd_en_cp.rd_en_1) && binsof (wr_ack_cp.wr_ack_1) ;
+    63                                               
+    64                                               }
+    65                                               overflow: cross wr_en_cp, rd_en_cp,overflow_cp;
+    66                                               underflow: cross wr_en_cp, rd_en_cp,underflow_cp
+    67                                               {
+    68                                                   illegal_bins underflow_illegal_1 = binsof (wr_en_cp.wr_en_0)&&binsof (rd_en_cp.rd_en_0) && binsof (underflow_cp.underflow_1);
+    69                                               }
+    70                                               full: cross wr_en_cp, rd_en_cp,full_cp
+    71                                               {
+    72                                                   illegal_bins full_illegal_1 = binsof (wr_en_cp.wr_en_0)&&binsof (rd_en_cp.rd_en_1) && binsof (full_cp.full_1);
+    73                                                   illegal_bins full_illegal_2 = binsof (wr_en_cp.wr_en_1)&&binsof (rd_en_cp.rd_en_1) && binsof (full_cp.full_1) ;
+    74                                                   
+    75                                               }
+    76                                               empty: cross wr_en_cp, rd_en_cp,empty_cp;
+    77                                               almostfull: cross wr_en_cp, rd_en_cp,almostfull_cp;
+    78                                               almostempty: cross wr_en_cp, rd_en_cp,almostempty_cp;
+    79                                               endgroup
+    80                                               
+    81                                                function new (string name = "FIFO_coverage",uvm_component parent =null);
+    82              1                          1       super.new(name,parent);
+    83              1                          1       cvr_grp=new();
+    84                                               endfunction
+    85                                               
+    86                                               function void build_phase (uvm_phase phase);
+    87              1                          1      super.build_phase(phase);
+    88              1                          1      cov_export=new("cov_export",this);
+    89              1                          1      cov_fifo=new("cov_fifo",this);
+    90                                               endfunction
+    91                                               
+    92                                               function void connect_phase (uvm_phase phase);
+    93              1                          1      super.connect_phase(phase);
+    94              1                          1      cov_export.connect(cov_fifo.analysis_export);
+    95                                               endfunction
+    96                                               
+    97                                               
+    98                                               task run_phase(uvm_phase phase);
+    99              1                          1      super.run_phase(phase);
+    100             1                          1      forever begin
+    101             1                       6002         cov_fifo.get(seq_item_cov);
+    102             1                       6001         cvr_grp.sample();
+    103                                               end
+    104                                              endtask
+    105                                              
+    106                                              endclass 
+    107                                              endpackage
+
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                         0         0         0     100.0
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms              0         0         0     100.0
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                      0         0         0     100.0
+
+================================Toggle Details================================
+
+Toggle Coverage for File FIFO_coverage.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+
+Total Node Count     =          0 
+Toggled Node Count   =          0 
+Untoggled Node Count =          0 
+
+Toggle Coverage      =      100.0% (0 of 0 bins)
+
+=================================================================================
+=== File: FIFO_driver.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                           15        11         4      73.3
+
+================================Statement Details================================
+
+Statement Coverage for file FIFO_driver.sv --
+
+    1                                                package FIFO_driver_pck;
+    2                                                
+    3                                                import FIFO_config_pck::*;
+    4                                                import FIFO_sequence_item_pck ::*;
+    5                                                import uvm_pkg::*;
+    6                                                `include "uvm_macros.svh"
+    7                                                class FIFO_driver extends uvm_driver#(FIFO_sequence_item);
+    8               1                    ***0***      `uvm_component_utils(FIFO_driver)
+    8               2                    ***0***     
+    8               3                    ***0***     
+    9                                                virtual FIFO_interface FIFO_vif;
+    10                                               FIFO_sequence_item stim_seq_item;
+    11                                               
+    12                                               function new (string name = "FIFO_driver",uvm_component parent =null);
+    13              1                          1       super.new(name,parent);
+    14                                               endfunction
+    15                                               
+    16                                               task run_phase(uvm_phase phase);
+    17              1                          1     super.run_phase(phase);
+    18              1                          1     forever begin
+    19              1                       6002     stim_seq_item = FIFO_sequence_item::type_id::create("stim_seq_item");
+    20              1                       6002     seq_item_port.get_next_item(stim_seq_item);
+    21              1                       6001     FIFO_vif.rst_n=stim_seq_item.rst_n;
+    22              1                       6001     FIFO_vif.wr_en=stim_seq_item.wr_en;
+    23              1                       6001     FIFO_vif.rd_en=stim_seq_item.rd_en;
+    24              1                       6001     FIFO_vif.data_in=stim_seq_item.data_in;
+    25              1                       6001     @(negedge FIFO_vif.clk);
+    26              1                       6001     seq_item_port.item_done();
+    27              1                    ***0***     `uvm_info("run_phase",stim_seq_item.convert2string_stimulus (),UVM_HIGH)
+    28                                               end
+    29                                               endtask
+    30                                               endclass
+    31                                               endpackage
+
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                         2         1         1      50.0
+
+================================Branch Details================================
+
+Branch Coverage for file FIFO_driver.sv --
+
+------------------------------------IF Branch------------------------------------
+    27                                      6001     Count coming in to IF
+    27              1                    ***0***     `uvm_info("run_phase",stim_seq_item.convert2string_stimulus (),UVM_HIGH)
+                                            6001     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms              0         0         0     100.0
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                      0         0         0     100.0
+
+================================Toggle Details================================
+
+Toggle Coverage for File FIFO_driver.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+
+Total Node Count     =          0 
+Toggled Node Count   =          0 
+Untoggled Node Count =          0 
+
+Toggle Coverage      =      100.0% (0 of 0 bins)
+
+=================================================================================
+=== File: FIFO_env.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                           10         7         3      70.0
+
+================================Statement Details================================
+
+Statement Coverage for file FIFO_env.sv --
+
+    1                                                package FIFO_env_pck;
+    2                                                import  FIFO_driver_pck::*;
+    3                                                import  FIFO_agent_pck::*;
+    4                                                import  FIFO_coverage_pck::*;
+    5                                                import  FIFO_scoreboard_pck::*;
+    6                                                import  FIFO_sequence_item_pck::*;
+    7                                                import  FIFO_sequencer_pck::*;
+    8                                                import uvm_pkg::*;
+    9                                                `include "uvm_macros.svh"
+    10                                               class FIFO_env extends uvm_env;
+    11              1                    ***0***     `uvm_component_utils(FIFO_env)
+    11              2                    ***0***     
+    11              3                    ***0***     
+    12                                                FIFO_agent agt;
+    13                                                FIFO_coverage cov;
+    14                                                FIFO_scoreboard sb;
+    15                                               function new (string name = "FIFO_env",uvm_component parent =null);
+    16              1                          1       super.new(name,parent);
+    17                                               endfunction
+    18                                               
+    19                                               function void build_phase (uvm_phase phase);
+    20              1                          1      super.build_phase(phase);
+    21                                               
+    22              1                          1      agt = FIFO_agent::type_id::create("agt",this);
+    23              1                          1       cov = FIFO_coverage::type_id::create("cov",this);
+    24              1                          1        sb = FIFO_scoreboard::type_id::create("sb",this);
+    25                                               endfunction
+    26                                               
+    27                                               function void connect_phase (uvm_phase phase);
+    28              1                          1      agt.agt_ap.connect(sb.sb_export);
+    29              1                          1      agt.agt_ap.connect(cov.cov_export);
+    30                                               endfunction
+    31                                               
+    32                                               endclass
+    33                                               endpackage
+
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                         0         0         0     100.0
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms              0         0         0     100.0
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                      0         0         0     100.0
+
+================================Toggle Details================================
+
+Toggle Coverage for File FIFO_env.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+
+Total Node Count     =          0 
+Toggled Node Count   =          0 
+Untoggled Node Count =          0 
+
+Toggle Coverage      =      100.0% (0 of 0 bins)
+
+=================================================================================
+=== File: FIFO_interface.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                            0         0         0     100.0
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                         0         0         0     100.0
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms              0         0         0     100.0
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                     86        86         0     100.0
+
+================================Toggle Details================================
+
+Toggle Coverage for File FIFO_interface.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+          8                                    clk           1           1      100.00 
+          9                             data_in[9]           1           1      100.00 
+          9                             data_in[8]           1           1      100.00 
+          9                             data_in[7]           1           1      100.00 
+          9                             data_in[6]           1           1      100.00 
+          9                             data_in[5]           1           1      100.00 
+          9                             data_in[4]           1           1      100.00 
+          9                             data_in[3]           1           1      100.00 
+          9                             data_in[2]           1           1      100.00 
+          9                             data_in[1]           1           1      100.00 
+          9                            data_in[15]           1           1      100.00 
+          9                            data_in[14]           1           1      100.00 
+          9                            data_in[13]           1           1      100.00 
+          9                            data_in[12]           1           1      100.00 
+          9                            data_in[11]           1           1      100.00 
+          9                            data_in[10]           1           1      100.00 
+          9                             data_in[0]           1           1      100.00 
+         10                                  wr_en           1           1      100.00 
+         10                                  rst_n           1           1      100.00 
+         10                                  rd_en           1           1      100.00 
+         11                            data_out[9]           1           1      100.00 
+         11                            data_out[8]           1           1      100.00 
+         11                            data_out[7]           1           1      100.00 
+         11                            data_out[6]           1           1      100.00 
+         11                            data_out[5]           1           1      100.00 
+         11                            data_out[4]           1           1      100.00 
+         11                            data_out[3]           1           1      100.00 
+         11                            data_out[2]           1           1      100.00 
+         11                            data_out[1]           1           1      100.00 
+         11                           data_out[15]           1           1      100.00 
+         11                           data_out[14]           1           1      100.00 
+         11                           data_out[13]           1           1      100.00 
+         11                           data_out[12]           1           1      100.00 
+         11                           data_out[11]           1           1      100.00 
+         11                           data_out[10]           1           1      100.00 
+         11                            data_out[0]           1           1      100.00 
+         12                                 wr_ack           1           1      100.00 
+         12                               overflow           1           1      100.00 
+         13                              underflow           1           1      100.00 
+         13                                   full           1           1      100.00 
+         13                                  empty           1           1      100.00 
+         13                             almostfull           1           1      100.00 
+         13                            almostempty           1           1      100.00 
+
+Total Node Count     =         43 
+Toggled Node Count   =         43 
+Untoggled Node Count =          0 
+
+Toggle Coverage      =      100.0% (86 of 86 bins)
+
+=================================================================================
+=== File: FIFO_main_sequence.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                           53        26        27      49.0
+
+================================Statement Details================================
+
+Statement Coverage for file FIFO_main_sequence.sv --
+
+    1                                                package FIFO_main_sequence_pck ;
+    2                                                import uvm_pkg::*;
+    3                                                `include "uvm_macros.svh"
+    4                                                import FIFO_sequence_item_pck::*;
+    5                                                class FIFO_write_read extends uvm_sequence #(FIFO_sequence_item);
+    6               1                    ***0***      `uvm_object_utils(FIFO_write_read)
+    6               2                    ***0***     
+    6               3                    ***0***     
+    6               4                    ***0***     
+    6               5                    ***0***     
+    6               6                          1     
+    6               7                    ***0***     
+    6               8                    ***0***     
+    6               9                    ***0***     
+    6              10                    ***0***     
+    7                                                FIFO_sequence_item seq_item;
+    8                                                
+    9                                                function new (string name = "FIFO_write_read");
+    10              1                          1       super.new(name);
+    11                                               endfunction
+    12                                               
+    13                                               task body;
+    14              1                       5000     repeat(5000) begin
+    15              1                       5000     seq_item = FIFO_sequence_item::type_id::create("seq_item");
+    16              1                       5000     start_item(seq_item);
+    17                                                assert(seq_item.randomize());
+    18              1                       5000     finish_item(seq_item); end
+    19                                               endtask
+    20                                               endclass
+    21                                               
+    22                                               class FIFO_write_only extends uvm_sequence #(FIFO_sequence_item);
+    23              1                    ***0***      `uvm_object_utils(FIFO_write_only)
+    23              2                    ***0***     
+    23              3                    ***0***     
+    23              4                    ***0***     
+    23              5                    ***0***     
+    23              6                          1     
+    23              7                    ***0***     
+    23              8                    ***0***     
+    23              9                    ***0***     
+    23             10                    ***0***     
+    24                                               FIFO_sequence_item seq_item;
+    25                                               
+    26                                               function new (string name = "FIFO_write_only");
+    27              1                          1       super.new(name);
+    28                                               endfunction
+    29                                               
+    30                                               task body;
+    31              1                        500     repeat(500) begin
+    32              1                        500     seq_item = FIFO_sequence_item::type_id::create("seq_item");
+    33              1                        500     start_item(seq_item);
+    34              1                        500     seq_item.wr_en=1;
+    35              1                        500     seq_item.rd_en=0;
+    36              1                        500     seq_item.wr_en.rand_mode(0);
+    37              1                        500     seq_item.rd_en.rand_mode(0);
+    38                                                assert(seq_item.randomize());
+    39              1                        500     finish_item(seq_item); end
+    40                                               endtask
+    41                                               endclass
+    42                                               
+    43                                               class FIFO_read_only extends uvm_sequence #(FIFO_sequence_item);
+    44              1                    ***0***      `uvm_object_utils(FIFO_read_only)
+    44              2                    ***0***     
+    44              3                    ***0***     
+    44              4                    ***0***     
+    44              5                    ***0***     
+    44              6                          1     
+    44              7                    ***0***     
+    44              8                    ***0***     
+    44              9                    ***0***     
+    44             10                    ***0***     
+    45                                               FIFO_sequence_item seq_item;
+    46                                               
+    47                                               function new (string name = "FIFO_read_only");
+    48              1                          1       super.new(name);
+    49                                               endfunction
+    50                                               
+    51                                               task body;
+    52              1                        500     repeat(500) begin
+    53              1                        500     seq_item = FIFO_sequence_item::type_id::create("seq_item");
+    54              1                        500     start_item(seq_item);
+    55              1                        500     seq_item.wr_en=0;
+    56              1                        500     seq_item.rd_en=1;
+    57              1                        500     seq_item.wr_en.rand_mode(0);
+    58              1                        500     seq_item.rd_en.rand_mode(0);
+    59                                                assert(seq_item.randomize());
+    60              1                        500     finish_item(seq_item); end
+    61                                               endtask
+    62                                               endclass
+    63                                               endpackage
+
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                        30         0        30       0.0
+
+================================Branch Details================================
+
+Branch Coverage for file FIFO_main_sequence.sv --
+
+------------------------------------IF Branch------------------------------------
+    6                                    ***0***     Count coming in to IF
+    6               1                    ***0***      `uvm_object_utils(FIFO_write_read)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    6                                    ***0***     Count coming in to IF
+    6               2                    ***0***      `uvm_object_utils(FIFO_write_read)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    6                                    ***0***     Count coming in to IF
+    6               3                    ***0***      `uvm_object_utils(FIFO_write_read)
+    6               4                    ***0***      `uvm_object_utils(FIFO_write_read)
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    6                                    ***0***     Count coming in to IF
+    6               5                    ***0***      `uvm_object_utils(FIFO_write_read)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    6                                    ***0***     Count coming in to IF
+    6               6                    ***0***      `uvm_object_utils(FIFO_write_read)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    23                                   ***0***     Count coming in to IF
+    23              1                    ***0***      `uvm_object_utils(FIFO_write_only)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    23                                   ***0***     Count coming in to IF
+    23              2                    ***0***      `uvm_object_utils(FIFO_write_only)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    23                                   ***0***     Count coming in to IF
+    23              3                    ***0***      `uvm_object_utils(FIFO_write_only)
+    23              4                    ***0***      `uvm_object_utils(FIFO_write_only)
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    23                                   ***0***     Count coming in to IF
+    23              5                    ***0***      `uvm_object_utils(FIFO_write_only)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    23                                   ***0***     Count coming in to IF
+    23              6                    ***0***      `uvm_object_utils(FIFO_write_only)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    44                                   ***0***     Count coming in to IF
+    44              1                    ***0***      `uvm_object_utils(FIFO_read_only)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    44                                   ***0***     Count coming in to IF
+    44              2                    ***0***      `uvm_object_utils(FIFO_read_only)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    44                                   ***0***     Count coming in to IF
+    44              3                    ***0***      `uvm_object_utils(FIFO_read_only)
+    44              4                    ***0***      `uvm_object_utils(FIFO_read_only)
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    44                                   ***0***     Count coming in to IF
+    44              5                    ***0***      `uvm_object_utils(FIFO_read_only)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    44                                   ***0***     Count coming in to IF
+    44              6                    ***0***      `uvm_object_utils(FIFO_read_only)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms              0         0         0     100.0
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                      0         0         0     100.0
+
+================================Toggle Details================================
+
+Toggle Coverage for File FIFO_main_sequence.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+
+Total Node Count     =          0 
+Toggled Node Count   =          0 
+Untoggled Node Count =          0 
+
+Toggle Coverage      =      100.0% (0 of 0 bins)
+
+=================================================================================
+=== File: FIFO_monitor.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                           24        20         4      83.3
+
+================================Statement Details================================
+
+Statement Coverage for file FIFO_monitor.sv --
+
+    1                                                package FIFO_monitor_pck ;
+    2                                                import uvm_pkg::*;
+    3                                                import FIFO_sequence_item_pck::*;
+    4                                                `include "uvm_macros.svh"
+    5                                                
+    6                                                class FIFO_monitor extends uvm_monitor;
+    7               1                    ***0***     `uvm_component_utils(FIFO_monitor)
+    7               2                    ***0***     
+    7               3                    ***0***     
+    8                                                
+    9                                                 virtual FIFO_interface FIFO_vif;
+    10                                               FIFO_sequence_item rsp_seq_item;
+    11                                               uvm_analysis_port #(FIFO_sequence_item) mon_ap;
+    12                                               
+    13                                               function new (string name = "FIFO_monitor",uvm_component parent =null);
+    14              1                          1       super.new(name,parent);
+    15                                               endfunction
+    16                                               
+    17                                               function void build_phase (uvm_phase phase);
+    18              1                          1      super.build_phase(phase);
+    19              1                          1     mon_ap =new("mon_ap",this);
+    20                                               endfunction
+    21                                               
+    22                                               task run_phase(uvm_phase phase);
+    23              1                          1     super.run_phase(phase);
+    24              1                          1     forever begin
+    25              1                       6002     rsp_seq_item = FIFO_sequence_item::type_id::create("rsp_seq_item");
+    26              1                       6002     @(negedge FIFO_vif.clk);
+    27              1                       6001     rsp_seq_item.rst_n=FIFO_vif.rst_n;
+    28              1                       6001     rsp_seq_item.wr_en=FIFO_vif.wr_en;
+    29              1                       6001     rsp_seq_item.rd_en=FIFO_vif.rd_en;
+    30              1                       6001     rsp_seq_item.data_in=FIFO_vif.data_in;
+    31              1                       6001     rsp_seq_item.data_out=FIFO_vif.data_out;
+    32              1                       6001     rsp_seq_item.overflow=FIFO_vif.overflow;
+    33              1                       6001     rsp_seq_item.underflow=FIFO_vif.underflow;
+    34              1                       6001     rsp_seq_item.full=FIFO_vif.full;
+    35              1                       6001     rsp_seq_item.almostfull=FIFO_vif.almostfull;
+    36              1                       6001     rsp_seq_item.empty=FIFO_vif.empty;
+    37              1                       6001     rsp_seq_item.almostempty=FIFO_vif.almostempty;
+    38              1                       6001     rsp_seq_item.wr_ack=FIFO_vif.wr_ack;
+    39              1                       6001     mon_ap.write(rsp_seq_item);
+    40              1                    ***0***     `uvm_info("run_phase",rsp_seq_item.convert2string (),UVM_HIGH)
+    41                                               end
+    42                                                 
+    43                                               endtask
+    44                                               
+    45                                               endclass
+    46                                               endpackage
+
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                         2         1         1      50.0
+
+================================Branch Details================================
+
+Branch Coverage for file FIFO_monitor.sv --
+
+------------------------------------IF Branch------------------------------------
+    40                                      6001     Count coming in to IF
+    40              1                    ***0***     `uvm_info("run_phase",rsp_seq_item.convert2string (),UVM_HIGH)
+                                            6001     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms              0         0         0     100.0
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                      0         0         0     100.0
+
+================================Toggle Details================================
+
+Toggle Coverage for File FIFO_monitor.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+
+Total Node Count     =          0 
+Toggled Node Count   =          0 
+Untoggled Node Count =          0 
+
+Toggle Coverage      =      100.0% (0 of 0 bins)
+
+=================================================================================
+=== File: FIFO_reset_sequence.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                           15         6         9      40.0
+
+================================Statement Details================================
+
+Statement Coverage for file FIFO_reset_sequence.sv --
+
+    1                                                package FIFO_reset_sequence_pck;
+    2                                                import uvm_pkg::*;
+    3                                                `include "uvm_macros.svh"
+    4                                                import FIFO_sequence_item_pck::*;
+    5                                                class FIFO_reset_sequence extends uvm_sequence #(FIFO_sequence_item);
+    6               1                    ***0***      `uvm_object_utils(FIFO_reset_sequence)
+    6               2                    ***0***     
+    6               3                    ***0***     
+    6               4                    ***0***     
+    6               5                    ***0***     
+    6               6                          1     
+    6               7                    ***0***     
+    6               8                    ***0***     
+    6               9                    ***0***     
+    6              10                    ***0***     
+    7                                                FIFO_sequence_item seq_item;
+    8                                                
+    9                                                function new (string name = "FIFO_reset_sequence");
+    10              1                          1       super.new(name);
+    11                                               endfunction
+    12                                               
+    13                                               task body;
+    14              1                          1     seq_item = FIFO_sequence_item::type_id::create("seq_item");
+    15              1                          1     start_item(seq_item);
+    16              1                          1     seq_item.rst_n=1'b0;
+    17              1                          1     finish_item(seq_item);
+    18                                               endtask
+    19                                               
+    20                                               endclass
+    21                                               endpackage
+
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                        10         0        10       0.0
+
+================================Branch Details================================
+
+Branch Coverage for file FIFO_reset_sequence.sv --
+
+------------------------------------IF Branch------------------------------------
+    6                                    ***0***     Count coming in to IF
+    6               1                    ***0***      `uvm_object_utils(FIFO_reset_sequence)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    6                                    ***0***     Count coming in to IF
+    6               2                    ***0***      `uvm_object_utils(FIFO_reset_sequence)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    6                                    ***0***     Count coming in to IF
+    6               3                    ***0***      `uvm_object_utils(FIFO_reset_sequence)
+    6               4                    ***0***      `uvm_object_utils(FIFO_reset_sequence)
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    6                                    ***0***     Count coming in to IF
+    6               5                    ***0***      `uvm_object_utils(FIFO_reset_sequence)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    6                                    ***0***     Count coming in to IF
+    6               6                    ***0***      `uvm_object_utils(FIFO_reset_sequence)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms              0         0         0     100.0
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                      0         0         0     100.0
+
+================================Toggle Details================================
+
+Toggle Coverage for File FIFO_reset_sequence.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+
+Total Node Count     =          0 
+Toggled Node Count   =          0 
+Untoggled Node Count =          0 
+
+Toggle Coverage      =      100.0% (0 of 0 bins)
+
+=================================================================================
+=== File: FIFO_scoreboard.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                           29        23         6      79.3
+
+================================Statement Details================================
+
+Statement Coverage for file FIFO_scoreboard.sv --
+
+    1                                                package FIFO_scoreboard_pck;
+    2                                                import FIFO_sequence_item_pck::*;
+    3                                                import uvm_pkg::*;
+    4                                                `include "uvm_macros.svh"
+    5                                                
+    6                                                class FIFO_scoreboard extends uvm_component;
+    7               1                    ***0***      `uvm_component_utils(FIFO_scoreboard)
+    7               2                    ***0***     
+    7               3                    ***0***     
+    8                                                 uvm_analysis_export #(FIFO_sequence_item) sb_export;
+    9                                                 uvm_tlm_analysis_fifo #(FIFO_sequence_item) sb_fifo;
+    10                                                FIFO_sequence_item seq_item_sb;
+    11                                               
+    12                                               
+    13              1                          1     int error_count=0;
+    14              1                          1     int correct_count=0;
+    15                                               logic [15:0] data_out_ref;
+    16                                               logic [15:0] mem [$];
+    17                                               
+    18                                               function new (string name = "FIFO_scoreboard",uvm_component parent =null);
+    19              1                          1       super.new(name,parent);
+    20                                               endfunction
+    21                                               
+    22                                               function void build_phase (uvm_phase phase);
+    23              1                          1      super.build_phase(phase);
+    24              1                          1      sb_export=new("sb_export",this);
+    25              1                          1      sb_fifo=new("sb_fifo",this);
+    26                                               endfunction
+    27                                               
+    28                                               function void connect_phase (uvm_phase phase);
+    29              1                          1      super.connect_phase(phase);
+    30              1                          1      sb_export.connect(sb_fifo.analysis_export);
+    31                                               endfunction
+    32                                               
+    33                                               task run_phase(uvm_phase phase);
+    34              1                          1      super.run_phase(phase);
+    35              1                          1      forever begin
+    36              1                       6002         sb_fifo.get(seq_item_sb);
+    37              1                       6001         ref_model(seq_item_sb);
+    38                                                   if(seq_item_sb.data_out != data_out_ref) begin
+    39                                                       `uvm_error("run_phase",$sformatf("comparison failed,transaction received by the dut %s while the refeence output
+    40              1                       3178              is 0h%0h",seq_item_sb.convert2string(), data_out_ref));
+    41              1                       3178             error_count++; end
+    42                                                   else begin
+    43              1                    ***0***             `uvm_info("run_phase",$sformatf("correct dataout %s ",seq_item_sb.convert2string()),UVM_HIGH);
+    44              1                       2823             correct_count++;
+    45                                                   end
+    46                                                end
+    47                                               endtask
+    48                                               
+    49                                               task ref_model( FIFO_sequence_item seq_item_chk);
+    50                                               if(seq_item_chk.rst_n) begin
+    51                                                   if(seq_item_chk.wr_en &&!seq_item_chk.rd_en && !seq_item_chk.full) begin
+    52              1                       1476             mem.push_front(seq_item_chk.data_in);
+    53                                                   end
+    54                                                   else if(!seq_item_chk.wr_en && seq_item_chk.rd_en && !seq_item_chk.empty) begin
+    55              1                        344             data_out_ref=mem.pop_back;
+    56                                                        
+    57                                                   end
+    58                                               
+    59                                                   else if(seq_item_chk.wr_en && seq_item_chk.rd_en && !seq_item_chk.full && !seq_item_chk.empty) begin
+    60              1                       1035              mem.push_front(seq_item_chk.data_in);
+    61              1                       1035              data_out_ref=mem.pop_back;
+    62                                                       
+    63                                                         
+    64                                                   end
+    65                                                   else if (seq_item_chk.wr_en && seq_item_chk.rd_en && seq_item_chk.full) begin
+    66              1                    ***0***              data_out_ref=mem.pop_back;
+    67                                                         
+    68                                                   end
+    69                                                    else if (seq_item_chk.wr_en && seq_item_chk.rd_en && seq_item_chk.empty) begin
+    70              1                    ***0***                 mem.push_front(seq_item_chk.data_in);
+    71                                                   end
+    72                                               end
+    73                                               else if(!seq_item_chk.rst_n) begin
+    74              1                        297         mem.delete;
+    75                                               end
+    76                                               
+    77                                               
+    78                                               endtask
+    79                                               
+    80                                               function void report_phase(uvm_phase phase);
+    81              1                          1     super.report_phase(phase);
+    82              1                          1     `uvm_info("run_phase",$sformatf("total successful transactions : %d",correct_count),UVM_MEDIUM);
+    83              1                          1     `uvm_info("run_phase",$sformatf("total failed transactions : %d",error_count),UVM_MEDIUM);
+    84                                               endfunction
+    85                                               
+    86                                               
+    87                                               endclass
+    88                                               endpackage
+
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                        19        12         7      63.1
+
+================================Branch Details================================
+
+Branch Coverage for file FIFO_scoreboard.sv --
+
+------------------------------------IF Branch------------------------------------
+    38                                      6001     Count coming in to IF
+    38              1                       3178         if(seq_item_sb.data_out != data_out_ref) begin
+    42              1                       2823         else begin
+Branch totals: 2 hits of 2 branches = 100.0%
+
+------------------------------------IF Branch------------------------------------
+    40                                      3178     Count coming in to IF
+    40              1                       3178              is 0h%0h",seq_item_sb.convert2string(), data_out_ref));
+                                         ***0***     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+------------------------------------IF Branch------------------------------------
+    43                                      2823     Count coming in to IF
+    43              1                    ***0***             `uvm_info("run_phase",$sformatf("correct dataout %s ",seq_item_sb.convert2string()),UVM_HIGH);
+                                            2823     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+------------------------------------IF Branch------------------------------------
+    50                                      6001     Count coming in to IF
+    50              1                       5704     if(seq_item_chk.rst_n) begin
+    73              1                        297     else if(!seq_item_chk.rst_n) begin
+                                         ***0***     All False Count
+Branch totals: 2 hits of 3 branches = 66.6%
+
+------------------------------------IF Branch------------------------------------
+    51                                      5704     Count coming in to IF
+    51              1                       1476         if(seq_item_chk.wr_en &&!seq_item_chk.rd_en && !seq_item_chk.full) begin
+    54              1                        344         else if(!seq_item_chk.wr_en && seq_item_chk.rd_en && !seq_item_chk.empty) begin
+    59              1                       1035         else if(seq_item_chk.wr_en && seq_item_chk.rd_en && !seq_item_chk.full && !seq_item_chk.empty) begin
+    65              1                    ***0***         else if (seq_item_chk.wr_en && seq_item_chk.rd_en && seq_item_chk.full) begin
+    69              1                    ***0***          else if (seq_item_chk.wr_en && seq_item_chk.rd_en && seq_item_chk.empty) begin
+                                            2849     All False Count
+Branch totals: 4 hits of 6 branches = 66.6%
+
+------------------------------------IF Branch------------------------------------
+    82                                         1     Count coming in to IF
+    82              1                          1     `uvm_info("run_phase",$sformatf("total successful transactions : %d",correct_count),UVM_MEDIUM);
+                                         ***0***     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+------------------------------------IF Branch------------------------------------
+    83                                         1     Count coming in to IF
+    83              1                          1     `uvm_info("run_phase",$sformatf("total failed transactions : %d",error_count),UVM_MEDIUM);
+                                         ***0***     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms             16         8         8      50.0
+
+================================Condition Details================================
+
+Condition Coverage for file FIFO_scoreboard.sv --
+
+----------------Focused Condition View-------------------
+Line       51 Item    1  (seq_item_chk.wr_en && ~seq_item_chk.rd_en && ~seq_item_chk.full)
+Condition totals: 3 of 3 input terms covered = 100.0%
+
+          Input Term   Covered  Reason for no coverage   Hint
+         -----------  --------  -----------------------  --------------
+  seq_item_chk.wr_en         Y
+  seq_item_chk.rd_en         Y
+   seq_item_chk.full         Y
+
+     Rows:       Hits  FEC Target            Non-masking condition(s)      
+ ---------  ---------  --------------------  -------------------------     
+  Row   1:          1  seq_item_chk.wr_en_0  -                             
+  Row   2:          1  seq_item_chk.wr_en_1  (~seq_item_chk.rd_en && ~seq_item_chk.full)
+  Row   3:          1  seq_item_chk.rd_en_0  (seq_item_chk.wr_en && ~seq_item_chk.full)
+  Row   4:          1  seq_item_chk.rd_en_1  seq_item_chk.wr_en            
+  Row   5:          1  seq_item_chk.full_0   (seq_item_chk.wr_en && ~seq_item_chk.rd_en)
+  Row   6:          1  seq_item_chk.full_1   (seq_item_chk.wr_en && ~seq_item_chk.rd_en)
+
+----------------Focused Condition View-------------------
+Line       54 Item    1  (~seq_item_chk.wr_en && seq_item_chk.rd_en && ~seq_item_chk.empty)
+Condition totals: 3 of 3 input terms covered = 100.0%
+
+          Input Term   Covered  Reason for no coverage   Hint
+         -----------  --------  -----------------------  --------------
+  seq_item_chk.wr_en         Y
+  seq_item_chk.rd_en         Y
+  seq_item_chk.empty         Y
+
+     Rows:       Hits  FEC Target            Non-masking condition(s)      
+ ---------  ---------  --------------------  -------------------------     
+  Row   1:          1  seq_item_chk.wr_en_0  (seq_item_chk.rd_en && ~seq_item_chk.empty)
+  Row   2:          1  seq_item_chk.wr_en_1  -                             
+  Row   3:          1  seq_item_chk.rd_en_0  ~seq_item_chk.wr_en           
+  Row   4:          1  seq_item_chk.rd_en_1  (~seq_item_chk.wr_en && ~seq_item_chk.empty)
+  Row   5:          1  seq_item_chk.empty_0  (~seq_item_chk.wr_en && seq_item_chk.rd_en)
+  Row   6:          1  seq_item_chk.empty_1  (~seq_item_chk.wr_en && seq_item_chk.rd_en)
+
+----------------Focused Condition View-------------------
+Line       59 Item    1  (seq_item_chk.wr_en && seq_item_chk.rd_en && ~seq_item_chk.full && ~seq_item_chk.empty)
+Condition totals: 2 of 4 input terms covered = 50.0%
+
+          Input Term   Covered  Reason for no coverage   Hint
+         -----------  --------  -----------------------  --------------
+  seq_item_chk.wr_en         Y
+  seq_item_chk.rd_en         Y
+   seq_item_chk.full         N  '_1' not hit             Hit '_1'
+  seq_item_chk.empty         N  '_1' not hit             Hit '_1'
+
+     Rows:       Hits  FEC Target            Non-masking condition(s)      
+ ---------  ---------  --------------------  -------------------------     
+  Row   1:          1  seq_item_chk.wr_en_0  -                             
+  Row   2:          1  seq_item_chk.wr_en_1  (seq_item_chk.rd_en && (~seq_item_chk.full && ~seq_item_chk.empty))
+  Row   3:          1  seq_item_chk.rd_en_0  seq_item_chk.wr_en            
+  Row   4:          1  seq_item_chk.rd_en_1  (seq_item_chk.wr_en && (~seq_item_chk.full && ~seq_item_chk.empty))
+  Row   5:          1  seq_item_chk.full_0   (seq_item_chk.wr_en && seq_item_chk.rd_en && ~seq_item_chk.empty)
+  Row   6:    ***0***  seq_item_chk.full_1   (seq_item_chk.wr_en && seq_item_chk.rd_en)
+  Row   7:          1  seq_item_chk.empty_0  (seq_item_chk.wr_en && seq_item_chk.rd_en && ~seq_item_chk.full)
+  Row   8:    ***0***  seq_item_chk.empty_1  (seq_item_chk.wr_en && seq_item_chk.rd_en && ~seq_item_chk.full)
+
+----------------Focused Condition View-------------------
+Line       65 Item    1  (seq_item_chk.wr_en && seq_item_chk.rd_en && seq_item_chk.full)
+Condition totals: 0 of 3 input terms covered = 0.0%
+
+          Input Term   Covered  Reason for no coverage   Hint
+         -----------  --------  -----------------------  --------------
+  seq_item_chk.wr_en         N  '_1' not hit             Hit '_1'
+  seq_item_chk.rd_en         N  '_1' not hit             Hit '_1'
+   seq_item_chk.full         N  No hits                  Hit '_0' and '_1'
+
+     Rows:       Hits  FEC Target            Non-masking condition(s)      
+ ---------  ---------  --------------------  -------------------------     
+  Row   1:          1  seq_item_chk.wr_en_0  -                             
+  Row   2:    ***0***  seq_item_chk.wr_en_1  (seq_item_chk.rd_en && seq_item_chk.full)
+  Row   3:          1  seq_item_chk.rd_en_0  seq_item_chk.wr_en            
+  Row   4:    ***0***  seq_item_chk.rd_en_1  (seq_item_chk.wr_en && seq_item_chk.full)
+  Row   5:    ***0***  seq_item_chk.full_0   (seq_item_chk.wr_en && seq_item_chk.rd_en)
+  Row   6:    ***0***  seq_item_chk.full_1   (seq_item_chk.wr_en && seq_item_chk.rd_en)
+
+----------------Focused Condition View-------------------
+Line       69 Item    1  (seq_item_chk.wr_en && seq_item_chk.rd_en && seq_item_chk.empty)
+Condition totals: 0 of 3 input terms covered = 0.0%
+
+          Input Term   Covered  Reason for no coverage   Hint
+         -----------  --------  -----------------------  --------------
+  seq_item_chk.wr_en         N  '_1' not hit             Hit '_1'
+  seq_item_chk.rd_en         N  '_1' not hit             Hit '_1'
+  seq_item_chk.empty         N  No hits                  Hit '_0' and '_1'
+
+     Rows:       Hits  FEC Target            Non-masking condition(s)      
+ ---------  ---------  --------------------  -------------------------     
+  Row   1:          1  seq_item_chk.wr_en_0  -                             
+  Row   2:    ***0***  seq_item_chk.wr_en_1  (seq_item_chk.rd_en && seq_item_chk.empty)
+  Row   3:          1  seq_item_chk.rd_en_0  seq_item_chk.wr_en            
+  Row   4:    ***0***  seq_item_chk.rd_en_1  (seq_item_chk.wr_en && seq_item_chk.empty)
+  Row   5:    ***0***  seq_item_chk.empty_0  (seq_item_chk.wr_en && seq_item_chk.rd_en)
+  Row   6:    ***0***  seq_item_chk.empty_1  (seq_item_chk.wr_en && seq_item_chk.rd_en)
+
+
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                      0         0         0     100.0
+
+================================Toggle Details================================
+
+Toggle Coverage for File FIFO_scoreboard.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+
+Total Node Count     =          0 
+Toggled Node Count   =          0 
+Untoggled Node Count =          0 
+
+Toggle Coverage      =      100.0% (0 of 0 bins)
+
+=================================================================================
+=== File: FIFO_sequencer.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                            4         1         3      25.0
+
+================================Statement Details================================
+
+Statement Coverage for file FIFO_sequencer.sv --
+
+    1                                                package FIFO_sequencer_pck ;
+    2                                                import uvm_pkg::*;
+    3                                                `include "uvm_macros.svh"
+    4                                                import FIFO_sequence_item_pck::*;
+    5                                                class FIFO_sequencer extends uvm_sequencer#(FIFO_sequence_item);
+    6               1                    ***0***      `uvm_component_utils(FIFO_sequencer)
+    6               2                    ***0***     
+    6               3                    ***0***     
+    7                                                
+    8                                                function new (string name = "FIFO_sequencer",uvm_component parent =null);
+    9               1                          1       super.new(name,parent);
+    10                                               endfunction
+    11                                               
+    12                                               endclass
+    13                                               endpackage
+
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                         0         0         0     100.0
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms              0         0         0     100.0
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                      0         0         0     100.0
+
+================================Toggle Details================================
+
+Toggle Coverage for File FIFO_sequencer.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+
+Total Node Count     =          0 
+Toggled Node Count   =          0 
+Untoggled Node Count =          0 
+
+Toggle Coverage      =      100.0% (0 of 0 bins)
+
+=================================================================================
+=== File: FIFO_sequnece_item.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                           13         3        10      23.0
+
+================================Statement Details================================
+
+Statement Coverage for file FIFO_sequnece_item.sv --
+
+    1                                                package FIFO_sequence_item_pck ;
+    2                                                import uvm_pkg::*;
+    3                                                `include "uvm_macros.svh"
+    4                                                class FIFO_sequence_item extends uvm_sequence_item;
+    5               1                    ***0***      `uvm_object_utils(FIFO_sequence_item)
+    5               2                    ***0***     
+    5               3                    ***0***     
+    5               4                    ***0***     
+    5               5                    ***0***     
+    5               6                       6001     
+    5               7                    ***0***     
+    5               8                    ***0***     
+    5               9                    ***0***     
+    5              10                    ***0***     
+    6                                                parameter FIFO_WIDTH = 16;
+    7                                                parameter FIFO_DEPTH = 8;
+    8                                                bit clk;
+    9                                                rand logic [FIFO_WIDTH-1:0] data_in;
+    10                                               rand bit  rst_n, wr_en, rd_en;
+    11                                               logic [FIFO_WIDTH-1:0] data_out;
+    12                                               bit wr_ack, overflow;
+    13                                               bit full, empty, almostfull, almostempty, underflow;
+    14                                               
+    15                                               
+    16                                                function new (string name = "FIFO_sequence_item");
+    17              1                      18005       super.new(name);
+    18                                                endfunction
+    19                                                 
+    20                                               function string convert2string ();
+    21              1                       3178       return $sformatf("%s reset =0b%0b ,datain =0h%0h,wr_en =0b%0b,rd_en =0b%0b ,dataout =0h%0h,wr_ack =0b%0b,overflow =0b%0b,
+    22                                                 underflow =0b%0b ,full =0b%0b,empty =0b%0b,almostfull =0b%0b,almostempty =0b%0b",
+    23                                                 super.convert2string(),rst_n,data_in,wr_en,rd_en,data_out,wr_ack,overflow,underflow,full,empty,almostfull,almostempty);
+    24                                               endfunction
+    25                                               
+    26                                               function string convert2string_stimulus ();
+    27              1                    ***0***       return $sformatf(" reset =0b%0b ,datain =0h%0h,wr_en =0b%0b,rd_en =0b%0b",rst_n,data_in,wr_en,rd_en);
+    28                                               endfunction
+    29                                               
+    30                                               constraint c1{rst_n dist{0:/5,1:/95};}
+    31                                               constraint c2{wr_en dist{0:/30 ,1:/70 };}
+    32                                               constraint c3{rd_en dist{0:/70,1:/30};}
+    33                                               
+    34                                               endclass
+    35                                               endpackage
+
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                        10         0        10       0.0
+
+================================Branch Details================================
+
+Branch Coverage for file FIFO_sequnece_item.sv --
+
+------------------------------------IF Branch------------------------------------
+    5                                    ***0***     Count coming in to IF
+    5               1                    ***0***      `uvm_object_utils(FIFO_sequence_item)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    5                                    ***0***     Count coming in to IF
+    5               2                    ***0***      `uvm_object_utils(FIFO_sequence_item)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    5                                    ***0***     Count coming in to IF
+    5               3                    ***0***      `uvm_object_utils(FIFO_sequence_item)
+    5               4                    ***0***      `uvm_object_utils(FIFO_sequence_item)
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    5                                    ***0***     Count coming in to IF
+    5               5                    ***0***      `uvm_object_utils(FIFO_sequence_item)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    5                                    ***0***     Count coming in to IF
+    5               6                    ***0***      `uvm_object_utils(FIFO_sequence_item)
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms              0         0         0     100.0
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                      0         0         0     100.0
+
+================================Toggle Details================================
+
+Toggle Coverage for File FIFO_sequnece_item.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+
+Total Node Count     =          0 
+Toggled Node Count   =          0 
+Untoggled Node Count =          0 
+
+Toggle Coverage      =      100.0% (0 of 0 bins)
+
+=================================================================================
+=== File: FIFO_test.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                           28        25         3      89.2
+
+================================Statement Details================================
+
+Statement Coverage for file FIFO_test.sv --
+
+    1                                                package FIFO_test_pck;
+    2                                                import FIFO_env_pck::*;
+    3                                                import FIFO_config_pck::*;
+    4                                                import FIFO_main_sequence_pck::*;
+    5                                                import FIFO_reset_sequence_pck::*;
+    6                                                import uvm_pkg::*;
+    7                                                `include "uvm_macros.svh"
+    8                                                class FIFO_test extends uvm_test;
+    9                                                
+    10              1                    ***0***     `uvm_component_utils(FIFO_test);
+    10              2                    ***0***     
+    10              3                          1     
+    11                                                virtual FIFO_interface FIFO_vif;
+    12                                               FIFO_config FIFO_cfg;
+    13                                               FIFO_reset_sequence reset_seq;
+    14                                               FIFO_write_read write_read; 
+    15                                               FIFO_write_only write_only;
+    16                                               FIFO_read_only read_only;
+    17                                               FIFO_env env;
+    18                                               function new (string name = "FIFO_test",uvm_component parent =null);
+    19              1                          1       super.new(name,parent);
+    20                                               endfunction
+    21                                               
+    22                                               function void build_phase (uvm_phase phase);
+    23              1                          1      super.build_phase(phase);
+    24              1                          1      env=FIFO_env::type_id::create("env",this);
+    25              1                          1      FIFO_cfg = FIFO_config::type_id::create("FIFO_cfg",this);
+    26              1                          1      reset_seq = FIFO_reset_sequence::type_id::create("reset_seq",this);
+    27              1                          1      write_read = FIFO_write_read::type_id::create("write_read",this);
+    28              1                          1      write_only = FIFO_write_only::type_id::create("write_only",this);
+    29              1                          1      read_only = FIFO_read_only::type_id::create("read_only",this);
+    30                                               
+    31                                                 if(!uvm_config_db #(virtual FIFO_interface)::get(this,"","FIFO_If",FIFO_cfg.FIFO_vif)) begin
+    32              1                    ***0***        `uvm_fatal("bulid_phase","Test - Unable to get the virtual interface of the shift_reg from the uvm_config_db") ;end
+    33                                               
+    34              1                          1      uvm_config_db #(FIFO_config)::set(this,"*","CFG",FIFO_cfg);
+    35                                               endfunction
+    36                                               
+    37                                               task run_phase(uvm_phase phase);
+    38              1                          1      super.run_phase(phase);
+    39              1                          1      phase.raise_objection(this);
+    40              1                          1      `uvm_info("run_phase","reset asserted",UVM_MEDIUM);
+    41              1                          1       reset_seq.start(env.agt.sqr);
+    42              1                          1      `uvm_info("run_phase","reset deasserted",UVM_MEDIUM);
+    43              1                          1     `uvm_info("run_phase","stimulas generation for write and read started",UVM_MEDIUM);
+    44              1                          1       write_read.start(env.agt.sqr);
+    45              1                          1      `uvm_info("run_phase","stimulas generation for write and read ended",UVM_MEDIUM);
+    46              1                          1      `uvm_info("run_phase","stimulas generation for write only started",UVM_MEDIUM);
+    47              1                          1       write_only.start(env.agt.sqr);
+    48              1                          1      `uvm_info("run_phase","stimulas generation for write only ended",UVM_MEDIUM);
+    49              1                          1      `uvm_info("run_phase","stimulas generation for read only started",UVM_MEDIUM);
+    50              1                          1       read_only.start(env.agt.sqr);
+    51              1                          1      `uvm_info("run_phase","stimulas generation for read only endedd",UVM_MEDIUM);
+    52              1                          1      phase.drop_objection(this);
+    53                                               endtask
+    54                                               
+    55                                               endclass
+    56                                               endpackage 
+
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                        20         9        11      45.0
+
+================================Branch Details================================
+
+Branch Coverage for file FIFO_test.sv --
+
+------------------------------------IF Branch------------------------------------
+    31                                         1     Count coming in to IF
+    31              1                    ***0***       if(!uvm_config_db #(virtual FIFO_interface)::get(this,"","FIFO_If",FIFO_cfg.FIFO_vif)) begin
+                                               1     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+------------------------------------IF Branch------------------------------------
+    32                                   ***0***     Count coming in to IF
+    32              1                    ***0***        `uvm_fatal("bulid_phase","Test - Unable to get the virtual interface of the shift_reg from the uvm_config_db") ;end
+                                         ***0***     All False Count
+Branch totals: 0 hits of 2 branches = 0.0%
+
+------------------------------------IF Branch------------------------------------
+    40                                         1     Count coming in to IF
+    40              1                          1      `uvm_info("run_phase","reset asserted",UVM_MEDIUM);
+                                         ***0***     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+------------------------------------IF Branch------------------------------------
+    42                                         1     Count coming in to IF
+    42              1                          1      `uvm_info("run_phase","reset deasserted",UVM_MEDIUM);
+                                         ***0***     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+------------------------------------IF Branch------------------------------------
+    43                                         1     Count coming in to IF
+    43              1                          1     `uvm_info("run_phase","stimulas generation for write and read started",UVM_MEDIUM);
+                                         ***0***     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+------------------------------------IF Branch------------------------------------
+    45                                         1     Count coming in to IF
+    45              1                          1      `uvm_info("run_phase","stimulas generation for write and read ended",UVM_MEDIUM);
+                                         ***0***     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+------------------------------------IF Branch------------------------------------
+    46                                         1     Count coming in to IF
+    46              1                          1      `uvm_info("run_phase","stimulas generation for write only started",UVM_MEDIUM);
+                                         ***0***     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+------------------------------------IF Branch------------------------------------
+    48                                         1     Count coming in to IF
+    48              1                          1      `uvm_info("run_phase","stimulas generation for write only ended",UVM_MEDIUM);
+                                         ***0***     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+------------------------------------IF Branch------------------------------------
+    49                                         1     Count coming in to IF
+    49              1                          1      `uvm_info("run_phase","stimulas generation for read only started",UVM_MEDIUM);
+                                         ***0***     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+------------------------------------IF Branch------------------------------------
+    51                                         1     Count coming in to IF
+    51              1                          1      `uvm_info("run_phase","stimulas generation for read only endedd",UVM_MEDIUM);
+                                         ***0***     All False Count
+Branch totals: 1 hit of 2 branches = 50.0%
+
+
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms              0         0         0     100.0
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                      0         0         0     100.0
+
+================================Toggle Details================================
+
+Toggle Coverage for File FIFO_test.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+
+Total Node Count     =          0 
+Toggled Node Count   =          0 
+Untoggled Node Count =          0 
+
+Toggle Coverage      =      100.0% (0 of 0 bins)
+
+=================================================================================
+=== File: FIFO_top.sv
+=================================================================================
+Statement Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Stmts                            6         6         0     100.0
+
+================================Statement Details================================
+
+Statement Coverage for file FIFO_top.sv --
+
+    1                                                
+    2                                                import uvm_pkg::*;
+    3                                                `include "uvm_macros.svh"
+    4                                                import FIFO_test_pck::*;
+    5                                                
+    6                                                module FIFO_top();
+    7                                                bit clk;
+    8                                                
+    9                                                initial begin
+    10              1                          1         clk=1'b1;
+    11              1                          1     forever begin
+    12              1                      12002     #5 clk=~clk;
+    12              2                      12001     
+    13                                               end
+    14                                               end
+    15                                               
+    16                                               FIFO_interface FIFO_if (clk);
+    17                                               FIFO DUT (FIFO_if);
+    18                                               bind FIFO FIFO_assertions #(FIFO_if.FIFO_WIDTH,FIFO_if.FIFO_DEPTH) INIT(FIFO_if.clk,FIFO_if.data_in,FIFO_if.rst_n,
+    19                                                FIFO_if.wr_en, FIFO_if.rd_en,FIFO_if.data_out,FIFO_if.wr_ack,FIFO_if.overflow,FIFO_if.full, FIFO_if.empty, 
+    20                                                FIFO_if.almostfull, FIFO_if.almostempty, FIFO_if.underflow);
+    21                                               
+    22                                               initial begin
+    23              1                          1     uvm_config_db #(virtual FIFO_interface)::set(null,"uvm_test_top","FIFO_If",FIFO_if);
+    24              1                          1     run_test("FIFO_test");
+    25                                               end
+    26                                               endmodule
+
+Branch Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Branches                         0         0         0     100.0
+Condition Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Condition Terms              0         0         0     100.0
+Expression Coverage:
+    Enabled Coverage            Active   Covered    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FEC Expression Terms             0         0         0     100.0
+FSM Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    FSMs                                                       100.0
+        States                       0         0         0     100.0
+        Transitions                  0         0         0     100.0
+Toggle Coverage:
+    Enabled Coverage            Active      Hits    Misses % Covered
+    ----------------            ------      ----    ------ ---------
+    Toggle Bins                      2         2         0     100.0
+
+================================Toggle Details================================
+
+Toggle Coverage for File FIFO_top.sv --
+
+       Line                                   Node      1H->0L      0L->1H  "Coverage"
+--------------------------------------------------------------------------------------
+          7                                    clk           1           1      100.00 
+
+Total Node Count     =          1 
+Toggled Node Count   =          1 
+Untoggled Node Count =          0 
+
+Toggle Coverage      =      100.0% (2 of 2 bins)
+
+COVERGROUP COVERAGE:
+-----------------------------------------------------------------------------------------------
+Covergroup                                             Metric       Goal    Status               
+                                                                                              
+-----------------------------------------------------------------------------------------------
+ TYPE /FIFO_coverage_pck/FIFO_coverage/cvr_grp         100.0%        100    Covered              
+    covered/total bins:                                    69         69                      
+    missing/total bins:                                     0         69                      
+    % Hit:                                             100.0%        100                      
+    Coverpoint cvr_grp::wr_ack_cp                      100.0%        100    Covered              
+        covered/total bins:                                 2          2                      
+        missing/total bins:                                 0          2                      
+        % Hit:                                         100.0%        100                      
+        bin wr_ack_0                                     3317          1    Covered              
+        bin wr_ack_1                                     2684          1    Covered              
+    Coverpoint cvr_grp::overflow_cp                    100.0%        100    Covered              
+        covered/total bins:                                 2          2                      
+        missing/total bins:                                 0          2                      
+        % Hit:                                         100.0%        100                      
+        bin overflow_0                                   4829          1    Covered              
+        bin overflow_1                                   1172          1    Covered              
+    Coverpoint cvr_grp::underflow_cp                   100.0%        100    Covered              
+        covered/total bins:                                 2          2                      
+        missing/total bins:                                 0          2                      
+        % Hit:                                         100.0%        100                      
+        bin underflow_0                                  5473          1    Covered              
+        bin underflow_1                                   528          1    Covered              
+    Coverpoint cvr_grp::full_cp                        100.0%        100    Covered              
+        covered/total bins:                                 2          2                      
+        missing/total bins:                                 0          2                      
+        % Hit:                                         100.0%        100                      
+        bin full_0                                       4434          1    Covered              
+        bin full_1                                       1567          1    Covered              
+    Coverpoint cvr_grp::almostfull_cp                  100.0%        100    Covered              
+        covered/total bins:                                 2          2                      
+        missing/total bins:                                 0          2                      
+        % Hit:                                         100.0%        100                      
+        bin almostfull_0                                 5083          1    Covered              
+        bin almostfull_1                                  918          1    Covered              
+    Coverpoint cvr_grp::empty_cp                       100.0%        100    Covered              
+        covered/total bins:                                 2          2                      
+        missing/total bins:                                 0          2                      
+        % Hit:                                         100.0%        100                      
+        bin empty_0                                      5066          1    Covered              
+        bin empty_1                                       935          1    Covered              
+    Coverpoint cvr_grp::almostempty_cp                 100.0%        100    Covered              
+        covered/total bins:                                 2          2                      
+        missing/total bins:                                 0          2                      
+        % Hit:                                         100.0%        100                      
+        bin almostempty_0                                5451          1    Covered              
+        bin almostempty_1                                 550          1    Covered              
+    Coverpoint cvr_grp::wr_en_cp                       100.0%        100    Covered              
+        covered/total bins:                                 2          2                      
+        missing/total bins:                                 0          2                      
+        % Hit:                                         100.0%        100                      
+        bin wr_en_0                                      1986          1    Covered              
+        bin wr_en_1                                      4015          1    Covered              
+    Coverpoint cvr_grp::rd_en_cp                       100.0%        100    Covered              
+        covered/total bins:                                 2          2                      
+        missing/total bins:                                 0          2                      
+        % Hit:                                         100.0%        100                      
+        bin rd_en_0                                      3960          1    Covered              
+        bin rd_en_1                                      2041          1    Covered              
+    Cross cvr_grp::wr_ack                              100.0%        100    Covered              
+        covered/total bins:                                 6          6                      
+        missing/total bins:                                 0          6                      
+        % Hit:                                         100.0%        100                      
+        bin <wr_en_0,rd_en_0,wr_ack_0>                   1043          1    Covered              
+        bin <wr_en_0,rd_en_1,wr_ack_0>                    943          1    Covered              
+        bin <wr_en_1,rd_en_0,wr_ack_0>                   1025          1    Covered              
+        bin <wr_en_1,rd_en_1,wr_ack_0>                    306          1    Covered              
+        bin <wr_en_1,rd_en_0,wr_ack_1>                   1892          1    Covered              
+        bin <wr_en_1,rd_en_1,wr_ack_1>                    792          1    Covered              
+        illegal_bin wr_ack_illegal_1                        0               ZERO                 
+        illegal_bin wr_ack_illegal_2                        0               ZERO                 
+    Cross cvr_grp::overflow                            100.0%        100    Covered              
+        covered/total bins:                                 8          8                      
+        missing/total bins:                                 0          8                      
+        % Hit:                                         100.0%        100                      
+        bin <wr_en_0,rd_en_0,overflow_0>                 1037          1    Covered              
+        bin <wr_en_1,rd_en_0,overflow_0>                 1789          1    Covered              
+        bin <wr_en_0,rd_en_1,overflow_0>                  939          1    Covered              
+        bin <wr_en_1,rd_en_1,overflow_0>                 1064          1    Covered              
+        bin <wr_en_0,rd_en_0,overflow_1>                    6          1    Covered              
+        bin <wr_en_1,rd_en_0,overflow_1>                 1128          1    Covered              
+        bin <wr_en_0,rd_en_1,overflow_1>                    4          1    Covered              
+        bin <wr_en_1,rd_en_1,overflow_1>                   34          1    Covered              
+    Cross cvr_grp::underflow                           100.0%        100    Covered              
+        covered/total bins:                                 7          7                      
+        missing/total bins:                                 0          7                      
+        % Hit:                                         100.0%        100                      
+        bin <wr_en_0,rd_en_0,underflow_0>                1043          1    Covered              
+        bin <wr_en_0,rd_en_1,underflow_0>                 417          1    Covered              
+        bin <wr_en_0,rd_en_1,underflow_1>                 526          1    Covered              
+        bin <wr_en_1,rd_en_0,underflow_0>                2916          1    Covered              
+        bin <wr_en_1,rd_en_1,underflow_0>                1097          1    Covered              
+        bin <wr_en_1,rd_en_0,underflow_1>                   1          1    Covered              
+        bin <wr_en_1,rd_en_1,underflow_1>                   1          1    Covered              
+        illegal_bin underflow_illegal_1                     0               ZERO                 
+    Cross cvr_grp::full                                100.0%        100    Covered              
+        covered/total bins:                                 6          6                      
+        missing/total bins:                                 0          6                      
+        % Hit:                                         100.0%        100                      
+        bin <wr_en_0,rd_en_0,full_0>                      790          1    Covered              
+        bin <wr_en_1,rd_en_0,full_0>                     1603          1    Covered              
+        bin <wr_en_0,rd_en_0,full_1>                      253          1    Covered              
+        bin <wr_en_1,rd_en_0,full_1>                     1314          1    Covered              
+        bin <wr_en_0,rd_en_1,full_0>                      943          1    Covered              
+        bin <wr_en_1,rd_en_1,full_0>                     1098          1    Covered              
+        illegal_bin full_illegal_1                          0               ZERO                 
+        illegal_bin full_illegal_2                          0               ZERO                 
+    Cross cvr_grp::empty                               100.0%        100    Covered              
+        covered/total bins:                                 8          8                      
+        missing/total bins:                                 0          8                      
+        % Hit:                                         100.0%        100                      
+        bin <wr_en_0,rd_en_0,empty_0>                     897          1    Covered              
+        bin <wr_en_1,rd_en_0,empty_0>                    2790          1    Covered              
+        bin <wr_en_0,rd_en_1,empty_0>                     344          1    Covered              
+        bin <wr_en_1,rd_en_1,empty_0>                    1035          1    Covered              
+        bin <wr_en_0,rd_en_0,empty_1>                     146          1    Covered              
+        bin <wr_en_1,rd_en_0,empty_1>                     127          1    Covered              
+        bin <wr_en_0,rd_en_1,empty_1>                     599          1    Covered              
+        bin <wr_en_1,rd_en_1,empty_1>                      63          1    Covered              
+    Cross cvr_grp::almostfull                          100.0%        100    Covered              
+        covered/total bins:                                 8          8                      
+        missing/total bins:                                 0          8                      
+        % Hit:                                         100.0%        100                      
+        bin <wr_en_0,rd_en_0,almostfull_0>                857          1    Covered              
+        bin <wr_en_1,rd_en_0,almostfull_0>               2723          1    Covered              
+        bin <wr_en_0,rd_en_1,almostfull_0>                843          1    Covered              
+        bin <wr_en_1,rd_en_1,almostfull_0>                660          1    Covered              
+        bin <wr_en_0,rd_en_0,almostfull_1>                186          1    Covered              
+        bin <wr_en_1,rd_en_0,almostfull_1>                194          1    Covered              
+        bin <wr_en_0,rd_en_1,almostfull_1>                100          1    Covered              
+        bin <wr_en_1,rd_en_1,almostfull_1>                438          1    Covered              
+    Cross cvr_grp::almostempty                         100.0%        100    Covered              
+        covered/total bins:                                 8          8                      
+        missing/total bins:                                 0          8                      
+        % Hit:                                         100.0%        100                      
+        bin <wr_en_0,rd_en_0,almostempty_0>               937          1    Covered              
+        bin <wr_en_1,rd_en_0,almostempty_0>              2704          1    Covered              
+        bin <wr_en_0,rd_en_1,almostempty_0>               897          1    Covered              
+        bin <wr_en_1,rd_en_1,almostempty_0>               913          1    Covered              
+        bin <wr_en_0,rd_en_0,almostempty_1>               106          1    Covered              
+        bin <wr_en_1,rd_en_0,almostempty_1>               213          1    Covered              
+        bin <wr_en_0,rd_en_1,almostempty_1>                46          1    Covered              
+        bin <wr_en_1,rd_en_1,almostempty_1>               185          1    Covered              
+ CLASS FIFO_coverage
+
+TOTAL COVERGROUP COVERAGE: 100.0%  COVERGROUP TYPES: 1
+
+DIRECTIVE COVERAGE:
+---------------------------------------------------------------------------------------------
+Name                                     Design Design   Lang File(Line)      Count Status    
+                                         Unit   UnitType                                      
+---------------------------------------------------------------------------------------------
+/FIFO_top/DUT/INIT/reset_check/reset_cover 
+                                         FIFO_assertions Verilog  SVA  FIFO_assertions.sv(16)
+                                                                                557 Covered   
+/FIFO_top/DUT/INIT/comb_checks/full_cover 
+                                         FIFO_assertions Verilog  SVA  FIFO_assertions.sv(23)
+                                                                                416 Covered   
+/FIFO_top/DUT/INIT/comb_checks/almostfull_cover 
+                                         FIFO_assertions Verilog  SVA  FIFO_assertions.sv(27)
+                                                                                537 Covered   
+/FIFO_top/DUT/INIT/comb_checks/empty_cover 
+                                         FIFO_assertions Verilog  SVA  FIFO_assertions.sv(31)
+                                                                                325 Covered   
+/FIFO_top/DUT/INIT/comb_checks/almostempty_cover 
+                                         FIFO_assertions Verilog  SVA  FIFO_assertions.sv(35)
+                                                                                341 Covered   
+/FIFO_top/DUT/INIT/writing_cover         FIFO_assertions Verilog  SVA  FIFO_assertions.sv(46)
+                                                                               2552 Covered   
+/FIFO_top/DUT/INIT/reading_cover         FIFO_assertions Verilog  SVA  FIFO_assertions.sv(53)
+                                                                                368 Covered   
+/FIFO_top/DUT/INIT/WriteNotRead_cover    FIFO_assertions Verilog  SVA  FIFO_assertions.sv(60)
+                                                                                 78 Covered   
+/FIFO_top/DUT/INIT/ReadNotWrite_cover    FIFO_assertions Verilog  SVA  FIFO_assertions.sv(67)
+                                                                                227 Covered   
+/FIFO_top/DUT/INIT/accept_writing_cover  FIFO_assertions Verilog  SVA  FIFO_assertions.sv(74)
+                                                                               2552 Covered   
+/FIFO_top/DUT/INIT/refuse_writing_cover  FIFO_assertions Verilog  SVA  FIFO_assertions.sv(81)
+                                                                               1082 Covered   
+/FIFO_top/DUT/INIT/count_no_change_cover FIFO_assertions Verilog  SVA  FIFO_assertions.sv(88)
+                                                                                947 Covered   
+/FIFO_top/DUT/INIT/count_up_cover        FIFO_assertions Verilog  SVA  FIFO_assertions.sv(96)
+                                                                               1877 Covered   
+/FIFO_top/DUT/INIT/count_down_cover      FIFO_assertions Verilog  SVA  FIFO_assertions.sv(104)
+                                                                                595 Covered   
+/FIFO_top/DUT/INIT/count_above_cover     FIFO_assertions Verilog  SVA  FIFO_assertions.sv(111)
+                                                                               6001 Covered   
+/FIFO_top/DUT/INIT/over_flow_cover       FIFO_assertions Verilog  SVA  FIFO_assertions.sv(118)
+                                                                                855 Covered   
+/FIFO_top/DUT/INIT/under_flow_cover      FIFO_assertions Verilog  SVA  FIFO_assertions.sv(125)
+                                                                                477 Covered   
+
+TOTAL DIRECTIVE COVERAGE: 100.0%  COVERS: 17
+
+ASSERTION RESULTS:
+-------------------------------------------------------
+Name                 File(Line)           Failure Pass 
+                                          Count   Count 
+-------------------------------------------------------
+/FIFO_top/DUT/INIT/reset_check/reset
+                     FIFO_assertions.sv(15)       0     1
+/FIFO_top/DUT/INIT/comb_checks/full_check
+                     FIFO_assertions.sv(22)       0     1
+/FIFO_top/DUT/INIT/comb_checks/almostfull_check
+                     FIFO_assertions.sv(26)       0     1
+/FIFO_top/DUT/INIT/comb_checks/empty_check
+                     FIFO_assertions.sv(30)       0     1
+/FIFO_top/DUT/INIT/comb_checks/almostempty_check
+                     FIFO_assertions.sv(34)       0     1
+/FIFO_top/DUT/INIT/writing_assert
+                     FIFO_assertions.sv(45)       0     1
+/FIFO_top/DUT/INIT/reading_assert
+                     FIFO_assertions.sv(52)       0     1
+/FIFO_top/DUT/INIT/WriteNotRead_assert
+                     FIFO_assertions.sv(59)       0     1
+/FIFO_top/DUT/INIT/ReadNotWrite_assert
+                     FIFO_assertions.sv(66)       0     1
+/FIFO_top/DUT/INIT/accept_writing_assert
+                     FIFO_assertions.sv(73)       0     1
+/FIFO_top/DUT/INIT/refuse_writing_assert
+                     FIFO_assertions.sv(80)       0     1
+/FIFO_top/DUT/INIT/count_no_change_assert
+                     FIFO_assertions.sv(87)       0     1
+/FIFO_top/DUT/INIT/count_up_assert
+                     FIFO_assertions.sv(95)       0     1
+/FIFO_top/DUT/INIT/count_down_assert
+                     FIFO_assertions.sv(103)       0     1
+/FIFO_top/DUT/INIT/count_above_assert
+                     FIFO_assertions.sv(110)       0     1
+/FIFO_top/DUT/INIT/over_flow_assert
+                     FIFO_assertions.sv(117)       0     1
+/FIFO_top/DUT/INIT/under_flow_assert
+                     FIFO_assertions.sv(124)       0     1
+/FIFO_main_sequence_pck/FIFO_write_read/body/#ublk#123879083#14/immed__17
+                     FIFO_main_sequence.sv(17)       0     1
+/FIFO_main_sequence_pck/FIFO_write_only/body/#ublk#123879083#31/immed__38
+                     FIFO_main_sequence.sv(38)       0     1
+/FIFO_main_sequence_pck/FIFO_read_only/body/#ublk#123879083#52/immed__59
+                     FIFO_main_sequence.sv(59)       0     1
+
+Total Coverage By File (code coverage only, filtered view): 72.1%
+
